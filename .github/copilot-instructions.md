@@ -48,8 +48,15 @@ npm run dev         # Dev mode (tsx)
 ## Key References
 - **Spec:** `docs/specs/whoop-mcp-server.md`
 - **Implementation plan:** `docs/specs/implementation-plan.md`
+- **Code review:** `docs/reviews/code-review-checkpoint-1.md` (Tasks 1–5 approved)
 - **WHOOP API base:** `https://api.prod.whoop.com/developer` (v2 endpoints)
 - **OAuth:** Authorization Code flow, tokens at `~/.whoop-mcp/tokens.json` (0600 perms)
+
+## Implementation Status
+- Tasks 1–6 complete (scaffold, types, token store, API client, OAuth, MCP server shell)
+- 114 tests passing, typecheck clean, build clean
+- **Next:** Task 7 — Tool implementations (7a–7f)
+- After that: Task 8 (error handling), Task 9 (entry point), Task 10 (docs)
 
 ## Boundaries
 - **Always:** Run tests before commits, validate input with Zod, store tokens securely (0600)

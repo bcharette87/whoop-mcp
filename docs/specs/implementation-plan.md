@@ -95,10 +95,10 @@
 | **3** | `npm test` — token store tests pass (read/write/refresh/file permissions) |
 | **4** | `npm test` — API client tests pass (mocked fetch, auth headers, error codes) |
 | **5** | `npm test` — OAuth tests pass. **Manual test:** run OAuth flow in terminal, authenticate with real WHOOP account, verify tokens saved |
-| **6** | `npm run build` — MCP server compiles. Can list tools via MCP inspector |
-| **7f** | `npm test` — all 6 tool tests pass |
+| **6** | `npm run build` — MCP server compiles. `npm test -- tests/server.test.ts` — 6 tools listed with correct schemas, stubs return "Not implemented". `createWhoopServer()` is a pure factory (no transport). |
+| **7f** | `npm test` — all 6 tool tests pass + server tests updated. `npm run typecheck && npm run build && npm run lint` all clean. Zero stubs remain in `server.ts`. Server factory ready for MCP Inspector (Task 9). |
 | **8** | `npm test` — error handling tests pass (429 retry, 401 re-auth) |
-| **9** | **Manual test:** `node dist/index.js` starts MCP server via stdio. Test with MCP inspector or Claude Desktop |
+| **9** | **Manual test:** `node dist/index.js` starts MCP server via stdio. **MCP Inspector test:** `npx @modelcontextprotocol/inspector node dist/index.js` — lists 6 tools, can call each one. Test with Claude Desktop. |
 | **10** | README is complete. `npx whoop-mcp` works from a clean install. |
 
 ---
@@ -154,58 +154,65 @@
 
 ### Task 6: MCP Server Shell
 - [ ] **Task:** Set up MCP server with `@modelcontextprotocol/sdk`, register all 6 tools with their schemas (handlers as stubs initially)
-  - **Acceptance:** MCP server starts on stdio transport, lists 6 tools with correct names and input schemas
-  - **Verify:** `npm run build` + test with MCP inspector (`npx @modelcontextprotocol/inspector`)
+  - **Acceptance:** `createWhoopServer(client)` returns an `McpServer` with 6 tools registered (correct names, descriptions, input schemas). Server is a pure factory — no transport, no OAuth, no env vars — so it can be connected to any transport (stdio, InMemoryTransport for tests, MCP Inspector later).
+  - **Verify:** `npm run build && npm test -- tests/server.test.ts`
   - **Files:**
     - `src/server.ts` — server creation and tool registration
+    - `tests/server.test.ts` — tool listing + stub behavior tests via InMemoryTransport
 
 ### Task 7a: Tool — get_profile
 - [ ] **Task:** Implement `get_profile` tool handler
-  - **Acceptance:** Calls `/v2/user/profile/basic`, returns `{ user_id, email, first_name, last_name }`
+  - **Acceptance:** Calls `/v2/user/profile/basic`, returns `{ user_id, email, first_name, last_name }`. Stub in `server.ts` replaced with real handler.
   - **Verify:** `npm test -- tests/tools/get-profile.test.ts`
   - **Files:**
     - `src/tools/get-profile.ts`
     - `tests/tools/get-profile.test.ts`
+    - `src/server.ts` (modify — replace get_profile stub)
 
 ### Task 7b: Tool — get_recovery_collection
 - [ ] **Task:** Implement `get_recovery_collection` tool handler
-  - **Acceptance:** Calls `/v2/recovery` with optional `start`, `end`, `limit` params. Returns paginated recovery records with scores.
+  - **Acceptance:** Calls `/v2/recovery` with optional `start`, `end`, `limit`, `nextToken` params. Returns paginated recovery records with scores. Stub in `server.ts` replaced.
   - **Verify:** `npm test -- tests/tools/get-recovery.test.ts`
   - **Files:**
     - `src/tools/get-recovery.ts`
     - `tests/tools/get-recovery.test.ts`
+    - `src/server.ts` (modify — replace get_recovery_collection stub)
 
 ### Task 7c: Tool — get_sleep_collection
 - [ ] **Task:** Implement `get_sleep_collection` tool handler
-  - **Acceptance:** Calls `/v2/activity/sleep` with optional `start`, `end`, `limit` params. Returns paginated sleep records.
+  - **Acceptance:** Calls `/v2/activity/sleep` with optional `start`, `end`, `limit`, `nextToken` params. Returns paginated sleep records. Stub in `server.ts` replaced.
   - **Verify:** `npm test -- tests/tools/get-sleep.test.ts`
   - **Files:**
     - `src/tools/get-sleep.ts`
     - `tests/tools/get-sleep.test.ts`
+    - `src/server.ts` (modify — replace get_sleep_collection stub)
 
 ### Task 7d: Tool — get_workout_collection
 - [ ] **Task:** Implement `get_workout_collection` tool handler
-  - **Acceptance:** Calls `/v2/activity/workout` with optional `start`, `end`, `limit` params. Returns paginated workout records.
+  - **Acceptance:** Calls `/v2/activity/workout` with optional `start`, `end`, `limit`, `nextToken` params. Returns paginated workout records. Stub in `server.ts` replaced.
   - **Verify:** `npm test -- tests/tools/get-workout.test.ts`
   - **Files:**
     - `src/tools/get-workout.ts`
     - `tests/tools/get-workout.test.ts`
+    - `src/server.ts` (modify — replace get_workout_collection stub)
 
 ### Task 7e: Tool — get_cycle_collection
 - [ ] **Task:** Implement `get_cycle_collection` tool handler
-  - **Acceptance:** Calls `/v2/cycle` with optional `start`, `end`, `limit` params. Returns paginated cycle records.
+  - **Acceptance:** Calls `/v2/cycle` with optional `start`, `end`, `limit`, `nextToken` params. Returns paginated cycle records. Stub in `server.ts` replaced.
   - **Verify:** `npm test -- tests/tools/get-cycle.test.ts`
   - **Files:**
     - `src/tools/get-cycle.ts`
     - `tests/tools/get-cycle.test.ts`
+    - `src/server.ts` (modify — replace get_cycle_collection stub)
 
 ### Task 7f: Tool — get_body_measurement
 - [ ] **Task:** Implement `get_body_measurement` tool handler
-  - **Acceptance:** Calls `/v2/user/measurement/body`. Returns `{ height_meter, weight_kilogram, max_heart_rate }`.
+  - **Acceptance:** Calls `/v2/user/measurement/body`. Returns `{ height_meter, weight_kilogram, max_heart_rate }`. Stub in `server.ts` replaced.
   - **Verify:** `npm test -- tests/tools/get-body-measurement.test.ts`
   - **Files:**
     - `src/tools/get-body-measurement.ts`
     - `tests/tools/get-body-measurement.test.ts`
+    - `src/server.ts` (modify — replace get_body_measurement stub)
 
 ### Task 8: Error Handling
 - [ ] **Task:** Add retry logic for rate limits (429) and re-auth prompting for expired tokens (401) to the API client
@@ -218,7 +225,7 @@
 ### Task 9: Entry Point + CLI
 - [ ] **Task:** Wire everything together in `index.ts`. Start OAuth if needed, create API client, create MCP server, connect tools, start stdio transport.
   - **Acceptance:** `node dist/index.js` starts the MCP server. `npx whoop-mcp` works after npm publish. Claude Desktop can connect to it.
-  - **Verify:** `npm run build && node dist/index.js` (manual test) + Claude Desktop config test
+  - **Verify:** `npm run build && node dist/index.js` (manual test) + MCP Inspector test (`npx @modelcontextprotocol/inspector node dist/index.js`) + Claude Desktop config test
   - **Files:**
     - `src/index.ts` (modify — full implementation)
     - `package.json` (modify — ensure `bin` field is correct)

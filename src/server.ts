@@ -1,13 +1,19 @@
 /**
  * MCP server setup and tool registration.
  *
- * Creates an McpServer with all 6 WHOOP tools registered as stubs.
- * Tool handlers will be replaced with real implementations in Tasks 7a–7f.
+ * Creates an McpServer with all 6 WHOOP tools registered.
+ * Each tool handler calls the WHOOP API via the provided WhoopClient.
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { WhoopClient } from "./api/client.js";
+import { getProfile } from "./tools/get-profile.js";
+import { getBodyMeasurement } from "./tools/get-body-measurement.js";
+import { getRecoveryCollection } from "./tools/get-recovery.js";
+import { getSleepCollection } from "./tools/get-sleep.js";
+import { getWorkoutCollection } from "./tools/get-workout.js";
+import { getCycleCollection } from "./tools/get-cycle.js";
 
 // ---------------------------------------------------------------------------
 // Shared schemas
@@ -38,13 +44,16 @@ const collectionInputSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// Stub response
+// JSON response helper
 // ---------------------------------------------------------------------------
 
-const STUB_RESPONSE = {
-  content: [{ type: "text" as const, text: "Not implemented yet" }],
-  isError: true,
-};
+function jsonContent(data: unknown): {
+  content: Array<{ type: "text"; text: string }>;
+} {
+  return {
+    content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Server factory
@@ -53,12 +62,13 @@ const STUB_RESPONSE = {
 /**
  * Create a configured MCP server with all 6 WHOOP tools registered.
  *
- * Tool handlers are stubs that return "Not implemented yet" — they will
- * be replaced with real implementations in Tasks 7a–7f.
+ * This is a pure factory — it does not start transports, handle OAuth,
+ * or read environment variables. Connect the returned server to any
+ * transport (stdio, InMemoryTransport, MCP Inspector).
  *
- * @param _client - WHOOP API client (unused by stubs, will be used by real handlers)
+ * @param client - WHOOP API client used by tool handlers
  */
-export function createWhoopServer(_client: WhoopClient): McpServer {
+export function createWhoopServer(client: WhoopClient): McpServer {
   const server = new McpServer({
     name: "whoop-mcp",
     version: "0.1.0",
@@ -74,7 +84,7 @@ export function createWhoopServer(_client: WhoopClient): McpServer {
         "Get the authenticated user's basic profile — name and email.",
       annotations: { readOnlyHint: true },
     },
-    async () => STUB_RESPONSE,
+    async () => jsonContent(await getProfile(client)),
   );
 
   // -------------------------------------------------------------------------
@@ -87,7 +97,7 @@ export function createWhoopServer(_client: WhoopClient): McpServer {
         "Get the user's body measurements — height, weight, and max heart rate.",
       annotations: { readOnlyHint: true },
     },
-    async () => STUB_RESPONSE,
+    async () => jsonContent(await getBodyMeasurement(client)),
   );
 
   // -------------------------------------------------------------------------
@@ -101,7 +111,8 @@ export function createWhoopServer(_client: WhoopClient): McpServer {
       inputSchema: collectionInputSchema,
       annotations: { readOnlyHint: true },
     },
-    async () => STUB_RESPONSE,
+    async (args: { start?: string; end?: string; limit?: number; nextToken?: string }) =>
+      jsonContent(await getRecoveryCollection(client, args)),
   );
 
   // -------------------------------------------------------------------------
@@ -115,7 +126,8 @@ export function createWhoopServer(_client: WhoopClient): McpServer {
       inputSchema: collectionInputSchema,
       annotations: { readOnlyHint: true },
     },
-    async () => STUB_RESPONSE,
+    async (args: { start?: string; end?: string; limit?: number; nextToken?: string }) =>
+      jsonContent(await getSleepCollection(client, args)),
   );
 
   // -------------------------------------------------------------------------
@@ -129,7 +141,8 @@ export function createWhoopServer(_client: WhoopClient): McpServer {
       inputSchema: collectionInputSchema,
       annotations: { readOnlyHint: true },
     },
-    async () => STUB_RESPONSE,
+    async (args: { start?: string; end?: string; limit?: number; nextToken?: string }) =>
+      jsonContent(await getWorkoutCollection(client, args)),
   );
 
   // -------------------------------------------------------------------------
@@ -143,7 +156,8 @@ export function createWhoopServer(_client: WhoopClient): McpServer {
       inputSchema: collectionInputSchema,
       annotations: { readOnlyHint: true },
     },
-    async () => STUB_RESPONSE,
+    async (args: { start?: string; end?: string; limit?: number; nextToken?: string }) =>
+      jsonContent(await getCycleCollection(client, args)),
   );
 
   return server;

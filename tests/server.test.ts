@@ -3,16 +3,172 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createWhoopServer } from "../src/server.js";
 import type { WhoopClient } from "../src/api/client.js";
+import type {
+  UserProfile,
+  BodyMeasurement,
+  RecoveryCollection,
+  SleepCollection,
+  WorkoutCollection,
+  CycleCollection,
+} from "../src/api/types.js";
+
+// ---------------------------------------------------------------------------
+// Fixtures
+// ---------------------------------------------------------------------------
+
+const PROFILE_FIXTURE: UserProfile = {
+  user_id: 12345,
+  email: "jane@example.com",
+  first_name: "Jane",
+  last_name: "Doe",
+};
+
+const BODY_MEASUREMENT_FIXTURE: BodyMeasurement = {
+  height_meter: 1.78,
+  weight_kilogram: 75.5,
+  max_heart_rate: 195,
+};
+
+const RECOVERY_FIXTURE: RecoveryCollection = {
+  records: [
+    {
+      cycle_id: 100,
+      sleep_id: "sleep-1",
+      user_id: 12345,
+      created_at: "2026-04-10T08:00:00.000Z",
+      updated_at: "2026-04-10T08:30:00.000Z",
+      score_state: "SCORED",
+      score: {
+        user_calibrating: false,
+        recovery_score: 85,
+        resting_heart_rate: 52,
+        hrv_rmssd_milli: 65.3,
+        spo2_percentage: 97.5,
+        skin_temp_celsius: 33.2,
+      },
+    },
+  ],
+};
+
+const SLEEP_FIXTURE: SleepCollection = {
+  records: [
+    {
+      id: "sleep-1",
+      cycle_id: 100,
+      user_id: 12345,
+      created_at: "2026-04-10T06:00:00.000Z",
+      updated_at: "2026-04-10T06:30:00.000Z",
+      start: "2026-04-09T23:00:00.000Z",
+      end: "2026-04-10T06:00:00.000Z",
+      timezone_offset: "-04:00",
+      nap: false,
+      score_state: "SCORED",
+      score: {
+        stage_summary: {
+          total_in_bed_time_milli: 25200000,
+          total_awake_time_milli: 1800000,
+          total_no_data_time_milli: 0,
+          total_light_sleep_time_milli: 9000000,
+          total_slow_wave_sleep_time_milli: 7200000,
+          total_rem_sleep_time_milli: 7200000,
+          sleep_cycle_count: 4,
+          disturbance_count: 2,
+        },
+        sleep_needed: {
+          baseline_milli: 28800000,
+          need_from_sleep_debt_milli: 0,
+          need_from_recent_strain_milli: 1800000,
+          need_from_recent_nap_milli: 0,
+        },
+        respiratory_rate: 15.2,
+        sleep_performance_percentage: 92,
+        sleep_consistency_percentage: 85,
+        sleep_efficiency_percentage: 93,
+      },
+    },
+  ],
+};
+
+const WORKOUT_FIXTURE: WorkoutCollection = {
+  records: [
+    {
+      id: "workout-1",
+      user_id: 12345,
+      created_at: "2026-04-10T18:00:00.000Z",
+      updated_at: "2026-04-10T19:00:00.000Z",
+      start: "2026-04-10T17:00:00.000Z",
+      end: "2026-04-10T18:00:00.000Z",
+      timezone_offset: "-04:00",
+      sport_name: "Running",
+      score_state: "SCORED",
+      score: {
+        strain: 14.2,
+        average_heart_rate: 155,
+        max_heart_rate: 182,
+        kilojoule: 2100,
+        percent_recorded: 100,
+        zone_durations: {
+          zone_zero_milli: 0,
+          zone_one_milli: 120000,
+          zone_two_milli: 600000,
+          zone_three_milli: 1200000,
+          zone_four_milli: 900000,
+          zone_five_milli: 180000,
+        },
+        distance_meter: 8500,
+        altitude_gain_meter: 45,
+        altitude_change_meter: 2,
+      },
+    },
+  ],
+};
+
+const CYCLE_FIXTURE: CycleCollection = {
+  records: [
+    {
+      id: 200,
+      user_id: 12345,
+      created_at: "2026-04-10T00:00:00.000Z",
+      updated_at: "2026-04-10T23:59:59.000Z",
+      start: "2026-04-10T00:00:00.000Z",
+      end: "2026-04-10T23:59:59.000Z",
+      timezone_offset: "-04:00",
+      score_state: "SCORED",
+      score: {
+        strain: 12.5,
+        kilojoule: 9500,
+        average_heart_rate: 68,
+        max_heart_rate: 182,
+      },
+    },
+  ],
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Minimal mock WhoopClient — stub tools don't actually call it */
+/** Endpoint-to-fixture mapping for the mock client */
+const ENDPOINT_FIXTURES: Record<string, unknown> = {
+  "/v2/user/profile/basic": PROFILE_FIXTURE,
+  "/v2/user/measurement/body": BODY_MEASUREMENT_FIXTURE,
+  "/v2/recovery": RECOVERY_FIXTURE,
+  "/v2/activity/sleep": SLEEP_FIXTURE,
+  "/v2/activity/workout": WORKOUT_FIXTURE,
+  "/v2/cycle": CYCLE_FIXTURE,
+};
+
+/** Mock WhoopClient that returns fixture data based on the endpoint path */
 function createMockClient(): WhoopClient {
   return {
-    get: async <T>(_path: string): Promise<T> => {
-      throw new Error("Mock client: should not be called by stub handlers");
+    get: async <T>(path: string): Promise<T> => {
+      // Strip query string to match base endpoint
+      const basePath = path.split("?")[0];
+      const fixture = ENDPOINT_FIXTURES[basePath];
+      if (!fixture) {
+        throw new Error(`Mock client: unexpected endpoint ${path}`);
+      }
+      return fixture as T;
     },
   };
 }
@@ -149,70 +305,92 @@ describe("createWhoopServer", () => {
   }
 
   // -------------------------------------------------------------------------
-  // Stub handler behavior
+  // Tool handler behavior (real implementations)
   // -------------------------------------------------------------------------
 
-  describe("stub handlers", () => {
-    it("get_profile stub returns isError with not-implemented message", async () => {
+  describe("tool handlers", () => {
+    it("get_profile returns user profile as JSON text", async () => {
       const result = await client.callTool({
         name: "get_profile",
         arguments: {},
       });
 
-      expect(result.isError).toBe(true);
-      expect(result.content).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            type: "text",
-            text: expect.stringContaining("Not implemented"),
-          }),
-        ]),
-      );
+      expect(result.isError).toBeFalsy();
+      expect(result.content).toHaveLength(1);
+
+      const content = result.content as Array<{ type: string; text: string }>;
+      const parsed = JSON.parse(content[0].text) as unknown;
+      expect(parsed).toEqual(PROFILE_FIXTURE);
     });
 
-    it("get_recovery_collection stub returns isError", async () => {
-      const result = await client.callTool({
-        name: "get_recovery_collection",
-        arguments: {},
-      });
-
-      expect(result.isError).toBe(true);
-    });
-
-    it("get_sleep_collection stub returns isError", async () => {
-      const result = await client.callTool({
-        name: "get_sleep_collection",
-        arguments: {},
-      });
-
-      expect(result.isError).toBe(true);
-    });
-
-    it("get_workout_collection stub returns isError", async () => {
-      const result = await client.callTool({
-        name: "get_workout_collection",
-        arguments: {},
-      });
-
-      expect(result.isError).toBe(true);
-    });
-
-    it("get_cycle_collection stub returns isError", async () => {
-      const result = await client.callTool({
-        name: "get_cycle_collection",
-        arguments: {},
-      });
-
-      expect(result.isError).toBe(true);
-    });
-
-    it("get_body_measurement stub returns isError", async () => {
+    it("get_body_measurement returns body measurement as JSON text", async () => {
       const result = await client.callTool({
         name: "get_body_measurement",
         arguments: {},
       });
 
-      expect(result.isError).toBe(true);
+      expect(result.isError).toBeFalsy();
+      expect(result.content).toHaveLength(1);
+
+      const content = result.content as Array<{ type: string; text: string }>;
+      const parsed = JSON.parse(content[0].text) as unknown;
+      expect(parsed).toEqual(BODY_MEASUREMENT_FIXTURE);
+    });
+
+    it("get_recovery_collection returns recovery data as JSON text", async () => {
+      const result = await client.callTool({
+        name: "get_recovery_collection",
+        arguments: {},
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(result.content).toHaveLength(1);
+
+      const content = result.content as Array<{ type: string; text: string }>;
+      const parsed = JSON.parse(content[0].text) as unknown;
+      expect(parsed).toEqual(RECOVERY_FIXTURE);
+    });
+
+    it("get_sleep_collection returns sleep data as JSON text", async () => {
+      const result = await client.callTool({
+        name: "get_sleep_collection",
+        arguments: {},
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(result.content).toHaveLength(1);
+
+      const content = result.content as Array<{ type: string; text: string }>;
+      const parsed = JSON.parse(content[0].text) as unknown;
+      expect(parsed).toEqual(SLEEP_FIXTURE);
+    });
+
+    it("get_workout_collection returns workout data as JSON text", async () => {
+      const result = await client.callTool({
+        name: "get_workout_collection",
+        arguments: {},
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(result.content).toHaveLength(1);
+
+      const content = result.content as Array<{ type: string; text: string }>;
+      const parsed = JSON.parse(content[0].text) as unknown;
+      expect(parsed).toEqual(WORKOUT_FIXTURE);
+    });
+
+    it("get_cycle_collection returns cycle data as JSON text", async () => {
+      const result = await client.callTool({
+        name: "get_cycle_collection",
+        arguments: {},
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(result.content).toHaveLength(1);
+
+      const content = result.content as Array<{ type: string; text: string }>;
+      const parsed = JSON.parse(content[0].text) as unknown;
+      expect(parsed).toEqual(CYCLE_FIXTURE);
     });
   });
 });

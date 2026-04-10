@@ -158,39 +158,40 @@ export async function getRecoveryCollection(
 
 ## Implementation Status
 
-> **Current phase:** Tasks 1–5 complete — scaffold, API types, token store, API client, and OAuth flow in place.
-> **Next task:** Task 6 — MCP Server Shell (`src/server.ts`)
-> **Plan:** `docs/specs/implementation-plan.md` → Task 6
+> **Current phase:** Tasks 1–7 complete — scaffold, API types, token store, API client, OAuth flow, MCP server shell, and all 6 tool implementations. 147 tests passing, typecheck clean, build clean, lint clean.
+> **Next task:** Task 8 — Error Handling (retry 429, re-auth 401)
+> **Plan:** `docs/specs/implementation-plan.md` → Task 8
 > **Spec:** `docs/specs/whoop-mcp-server.md`
+> **Code review:** `docs/reviews/code-review-checkpoint-1.md` (Tasks 1–5 approved)
 
-## Active Task Context: Task 6 — MCP Server Shell
+## Active Task Context: Task 8 — Error Handling
 
 ### What We're Building
-MCP server setup with `@modelcontextprotocol/sdk`, register all 6 tools with their schemas (handlers as stubs initially), stdio transport.
+Add retry logic for rate limits (429) and re-auth prompting for expired tokens (401) to the API client. Network errors should produce clear error messages.
 
 ### Dependencies (already complete)
-- `src/auth/oauth.ts` ✅ — `authenticate()` returns valid access token
-- `src/api/client.ts` ✅ — `createWhoopClient()` wraps WHOOP API with auth
-- `src/api/types.ts` ✅ — all response types
-- `src/api/endpoints.ts` ✅ — all endpoint constants
+- `src/api/client.ts` ✅ — `WhoopClient` with `get<T>(path)` method (modify for retry/re-auth)
+- `src/tools/*.ts` ✅ — all 6 tool handlers (consume the client, no changes needed)
+- `src/server.ts` ✅ — MCP server with all 6 tools wired to real handlers
 
-### Consumed By
-- `src/tools/*.ts` (Tasks 7a-7f) — tool handler implementations
-- `src/index.ts` (Task 9) — wires everything together
+### After Task 8, Remaining Work
+- Task 9: Entry point + CLI (`src/index.ts` — wire everything together)
+- Task 10: Docs + publish prep
 
 ## Implementation Order
 
 1. ✅ Project scaffold (package.json, tsconfig, eslint, vitest)
 2. ✅ WHOOP API types (`src/api/types.ts`, `src/api/endpoints.ts`)
-3. ✅ Token store (`src/auth/token-store.ts`)
-4. ✅ API client (`src/api/client.ts`)
+3. ✅ Token store (`src/auth/token-store.ts`) — 18 tests
+4. ✅ API client (`src/api/client.ts`) — 16 tests
 5. ✅ OAuth flow (`src/auth/oauth.ts`, `src/auth/callback-server.ts`) — 41 tests
-6. MCP server shell (`src/server.ts`) ← **NEXT**
-7. Tool implementations (7a-7f, can be parallel after step 6)
-8. Error handling (retry 429, re-auth 401)
+6. ✅ MCP server shell (`src/server.ts`) — 16 tests
+7. ✅ Tool implementations (`src/tools/*.ts`) — 33 tool tests + 16 server integration tests
+8. Error handling (retry 429, re-auth 401) ← **NEXT**
 9. Entry point + CLI (`src/index.ts`)
 10. Docs + publish prep
-7. Tool implementations (7a-7f, can be parallel after step 6)
-8. Error handling (retry 429, re-auth 401)
-9. Entry point + CLI (`src/index.ts`)
-10. Docs + publish prep
+
+## Known Issues from Code Review
+- Callback server tests use random port range (flaky in CI) — use port `0` instead
+- Refresh failure silently swallowed in `authenticate()` — should log/differentiate errors
+- `openBrowser` has shell injection vector — should use `spawn` with arg arrays
