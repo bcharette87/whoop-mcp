@@ -131,4 +131,89 @@ describe("createWhoopClient", () => {
       );
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Task 4c: Error handling — non-2xx responses
+  // -------------------------------------------------------------------------
+
+  describe("get (error responses)", () => {
+    /** Helper to create a mock error Response with JSON body */
+    function mockErrorResponse(
+      status: number,
+      statusText: string,
+      body: unknown,
+    ): Response {
+      return {
+        ok: false,
+        status,
+        statusText,
+        json: () => Promise.resolve(body),
+        text: () => Promise.resolve(JSON.stringify(body)),
+      } as Response;
+    }
+
+    it("throws WhoopApiError on 401 Unauthorized", async () => {
+      mockFetch.mockResolvedValue(
+        mockErrorResponse(401, "Unauthorized", { message: "Invalid token" }),
+      );
+      const client = createWhoopClient({ accessToken: TEST_TOKEN, baseUrl: TEST_BASE_URL });
+
+      await expect(client.get("/v2/recovery")).rejects.toThrow(WhoopApiError);
+
+      try {
+        await client.get("/v2/recovery");
+      } catch (error) {
+        expect(error).toBeInstanceOf(WhoopApiError);
+        const apiError = error as WhoopApiError;
+        expect(apiError.statusCode).toBe(401);
+        expect(apiError.statusText).toBe("Unauthorized");
+        expect(apiError.body).toEqual({ message: "Invalid token" });
+      }
+    });
+
+    it("throws WhoopApiError on 429 Too Many Requests", async () => {
+      mockFetch.mockResolvedValue(
+        mockErrorResponse(429, "Too Many Requests", { retry_after: 30 }),
+      );
+      const client = createWhoopClient({ accessToken: TEST_TOKEN, baseUrl: TEST_BASE_URL });
+
+      await expect(client.get("/v2/recovery")).rejects.toThrow(WhoopApiError);
+
+      try {
+        await client.get("/v2/recovery");
+      } catch (error) {
+        const apiError = error as WhoopApiError;
+        expect(apiError.statusCode).toBe(429);
+        expect(apiError.body).toEqual({ retry_after: 30 });
+      }
+    });
+
+    it("throws WhoopApiError on 500 Internal Server Error", async () => {
+      mockFetch.mockResolvedValue(
+        mockErrorResponse(500, "Internal Server Error", { error: "unexpected" }),
+      );
+      const client = createWhoopClient({ accessToken: TEST_TOKEN, baseUrl: TEST_BASE_URL });
+
+      await expect(client.get("/v2/recovery")).rejects.toThrow(WhoopApiError);
+
+      try {
+        await client.get("/v2/recovery");
+      } catch (error) {
+        const apiError = error as WhoopApiError;
+        expect(apiError.statusCode).toBe(500);
+        expect(apiError.statusText).toBe("Internal Server Error");
+      }
+    });
+
+    it("includes status code and text in error message", async () => {
+      mockFetch.mockResolvedValue(
+        mockErrorResponse(403, "Forbidden", null),
+      );
+      const client = createWhoopClient({ accessToken: TEST_TOKEN, baseUrl: TEST_BASE_URL });
+
+      await expect(client.get("/v2/recovery")).rejects.toThrow(
+        "WHOOP API error: 403 Forbidden",
+      );
+    });
+  });
 });
