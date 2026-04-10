@@ -77,17 +77,39 @@ export async function saveTokens(
 }
 
 /**
+ * Validate that parsed JSON has the required OAuthTokens shape.
+ * Prevents confusing runtime errors from corrupted/tampered tokens.json.
+ */
+function isValidTokenShape(data: unknown): data is OAuthTokens {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    "access_token" in data &&
+    typeof (data as Record<string, unknown>).access_token === "string" &&
+    "refresh_token" in data &&
+    typeof (data as Record<string, unknown>).refresh_token === "string" &&
+    "expires_at" in data &&
+    typeof (data as Record<string, unknown>).expires_at === "number"
+  );
+}
+
+/**
  * Load tokens from disk.
  *
- * Returns the parsed `OAuthTokens` if the file exists and contains valid JSON.
- * Returns `null` if the file is missing or contains malformed JSON.
+ * Returns the parsed `OAuthTokens` if the file exists and contains valid JSON
+ * with the correct shape. Returns `null` if the file is missing, contains
+ * malformed JSON, or has an invalid shape.
  */
 export async function loadTokens(
   tokenDir?: string,
 ): Promise<OAuthTokens | null> {
   try {
     const raw = await readFile(tokenFilePath(tokenDir), { encoding: "utf-8" });
-    return JSON.parse(raw) as OAuthTokens;
+    const parsed: unknown = JSON.parse(raw);
+    if (!isValidTokenShape(parsed)) {
+      return null;
+    }
+    return parsed;
   } catch {
     return null;
   }

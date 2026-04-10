@@ -18,7 +18,7 @@ import {
   WHOOP_REDIRECT_URI,
   WHOOP_REQUIRED_SCOPES,
 } from "../api/endpoints.js";
-import { exec } from "node:child_process";
+import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 
 // ---------------------------------------------------------------------------
@@ -184,19 +184,20 @@ export function toOAuthTokens(response: TokenResponse): OAuthTokens {
 /**
  * Open a URL in the user's default browser.
  *
+ * Uses `spawn` with argument arrays to avoid shell injection.
  * Best-effort — if the open command fails, the URL is logged to stderr
  * so the user can copy/paste it manually. Never throws.
  */
 export function openBrowser(url: string): void {
   try {
-    const command =
-      process.platform === "darwin"
-        ? `open "${url}"`
-        : process.platform === "win32"
-          ? `start "${url}"`
-          : `xdg-open "${url}"`;
+    const commands: Record<string, [string, string[]]> = {
+      darwin: ["open", [url]],
+      win32: ["cmd", ["/c", "start", url]],
+      linux: ["xdg-open", [url]],
+    };
 
-    exec(command);
+    const [cmd, args] = commands[process.platform] ?? ["xdg-open", [url]];
+    spawn(cmd, args, { detached: true, stdio: "ignore" }).unref();
   } catch {
     // Best-effort — log the URL for manual copy/paste
     console.error(
@@ -247,8 +248,9 @@ export async function authenticate(config: OAuthConfig): Promise<string> {
       const tokens = toOAuthTokens(refreshed);
       await saveTokens(tokens, config.tokenDir);
       return tokens.access_token;
-    } catch {
-      // Refresh failed — fall through to full OAuth flow
+    } catch (error: unknown) {
+      // Log the refresh failure so it's diagnosable, then fall through to full OAuth flow
+      console.error("Token refresh failed, starting full OAuth flow:", error);
     }
   }
 

@@ -33,6 +33,19 @@ export interface CallbackServerOptions {
 // HTML responses
 // ---------------------------------------------------------------------------
 
+/**
+ * Escape a string for safe embedding in HTML.
+ * Prevents reflected XSS from attacker-controlled query parameters.
+ */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 const SUCCESS_HTML = `<!DOCTYPE html>
 <html><head><title>WHOOP MCP — Success</title></head>
 <body style="font-family:system-ui,sans-serif;text-align:center;padding:3rem">
@@ -45,7 +58,7 @@ function errorHtml(message: string): string {
 <html><head><title>WHOOP MCP — Error</title></head>
 <body style="font-family:system-ui,sans-serif;text-align:center;padding:3rem">
 <h1>❌ Authentication Failed</h1>
-<p>${message}</p>
+<p>${escapeHtml(message)}</p>
 </body></html>`;
 }
 
@@ -156,6 +169,19 @@ export function startCallbackServer(
       }
     }, timeoutMs);
 
-    server.listen(port);
+    // Handle server errors (e.g., port already in use)
+    server.on("error", (err: NodeJS.ErrnoException) => {
+      cleanup();
+      if (!settled) {
+        settled = true;
+        const msg =
+          err.code === "EADDRINUSE"
+            ? `Port ${port} is already in use. Close the other application and try again.`
+            : `Callback server error: ${err.message}`;
+        reject(new Error(msg));
+      }
+    });
+
+    server.listen(port, "127.0.0.1");
   });
 }

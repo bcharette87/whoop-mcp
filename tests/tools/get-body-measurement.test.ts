@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { getBodyMeasurement } from "../../src/tools/get-body-measurement.js";
-import type { WhoopClient } from "../../src/api/client.js";
 import type { BodyMeasurement } from "../../src/api/types.js";
 import { ENDPOINT_BODY_MEASUREMENT } from "../../src/api/endpoints.js";
+import { createMockClient } from "../helpers/mock-client.js";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -13,16 +13,6 @@ const BODY_MEASUREMENT_FIXTURE: BodyMeasurement = {
   weight_kilogram: 75.5,
   max_heart_rate: 195,
 };
-
-// ---------------------------------------------------------------------------
-// Helper
-// ---------------------------------------------------------------------------
-
-function createMockClient(response: unknown): WhoopClient {
-  return {
-    get: vi.fn().mockResolvedValue(response),
-  } as unknown as WhoopClient;
-}
 
 // ---------------------------------------------------------------------------
 // Tests

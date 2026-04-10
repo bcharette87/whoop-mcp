@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { getProfile } from "../../src/tools/get-profile.js";
-import type { WhoopClient } from "../../src/api/client.js";
 import type { UserProfile } from "../../src/api/types.js";
 import { ENDPOINT_USER_PROFILE } from "../../src/api/endpoints.js";
+import { createMockClient } from "../helpers/mock-client.js";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -14,16 +14,6 @@ const PROFILE_FIXTURE: UserProfile = {
   first_name: "Jane",
   last_name: "Doe",
 };
-
-// ---------------------------------------------------------------------------
-// Helper
-// ---------------------------------------------------------------------------
-
-function createMockClient(response: unknown): WhoopClient {
-  return {
-    get: vi.fn().mockResolvedValue(response),
-  } as unknown as WhoopClient;
-}
 
 // ---------------------------------------------------------------------------
 // Tests

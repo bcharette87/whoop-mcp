@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { getSleepCollection } from "../../src/tools/get-sleep.js";
-import type { WhoopClient } from "../../src/api/client.js";
 import type { SleepCollection } from "../../src/api/types.js";
 import { ENDPOINT_SLEEP } from "../../src/api/endpoints.js";
+import { createMockClient } from "../helpers/mock-client.js";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -47,16 +47,6 @@ const SLEEP_FIXTURE: SleepCollection = {
   ],
   next_token: "sleep-page-2",
 };
-
-// ---------------------------------------------------------------------------
-// Helper
-// ---------------------------------------------------------------------------
-
-function createMockClient(response: unknown): WhoopClient {
-  return {
-    get: vi.fn().mockResolvedValue(response),
-  } as unknown as WhoopClient;
-}
 
 // ---------------------------------------------------------------------------
 // Tests

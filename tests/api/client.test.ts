@@ -135,6 +135,16 @@ describe("createWhoopClient", () => {
         expect.anything(),
       );
     });
+
+    it("sends AbortSignal.timeout for request timeout", async () => {
+      mockFetch.mockResolvedValue(mockJsonResponse({ ok: true }));
+      const client = createWhoopClient({ accessToken: TEST_TOKEN, baseUrl: TEST_BASE_URL });
+
+      await client.get("/v2/recovery");
+
+      const callArgs = mockFetch.mock.calls[0] as [string, RequestInit];
+      expect(callArgs[1].signal).toBeDefined();
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -363,6 +373,26 @@ describe("createWhoopClient", () => {
       expect(mockFetch).toHaveBeenCalledTimes(1);
 
       // Should resolve after 5 seconds
+      await vi.advanceTimersByTimeAsync(1000);
+      const result = await promise;
+      expect(result).toEqual({ ok: true });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("caps Retry-After to 60 seconds maximum", async () => {
+      // Server says wait 999999 seconds — should be capped to 60s
+      mockFetch
+        .mockResolvedValueOnce(mock429Response("999999"))
+        .mockResolvedValueOnce(mockJsonResponse({ ok: true }));
+      const client = createWhoopClient({ accessToken: TEST_TOKEN, baseUrl: TEST_BASE_URL });
+
+      const promise = client.get("/v2/recovery");
+
+      // Should not resolve before 60 seconds
+      await vi.advanceTimersByTimeAsync(59_000);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      // Should resolve at 60 seconds (the cap), not 999999 seconds
       await vi.advanceTimersByTimeAsync(1000);
       const result = await promise;
       expect(result).toEqual({ ok: true });

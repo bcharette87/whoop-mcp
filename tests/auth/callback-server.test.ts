@@ -155,6 +155,31 @@ describe("startCallbackServer", () => {
       await expect(resultPromise).rejects.toThrow(/User denied access/);
     });
 
+    it("HTML-escapes error_description to prevent reflected XSS", async () => {
+      const port = 49152 + Math.floor(Math.random() * 1000);
+
+      const resultPromise = startCallbackServer({
+        port,
+        expectedState: "some-state",
+        timeoutMs: 5_000,
+      });
+      resultPromise.catch(() => {});
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const xssPayload = "<script>alert('XSS')</script>";
+      const response = await fetch(
+        `http://localhost:${port}/callback?error=access_denied&error_description=${encodeURIComponent(xssPayload)}`,
+      );
+
+      const html = await response.text();
+      // Should NOT contain raw <script> — should be escaped
+      expect(html).not.toContain("<script>");
+      expect(html).toContain("&lt;script&gt;");
+
+      await expect(resultPromise).rejects.toThrow();
+    });
+
     it("rejects with a timeout error if no callback arrives", async () => {
       const port = 49152 + Math.floor(Math.random() * 1000);
 

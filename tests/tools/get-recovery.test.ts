@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { getRecoveryCollection } from "../../src/tools/get-recovery.js";
-import type { WhoopClient } from "../../src/api/client.js";
 import type { RecoveryCollection } from "../../src/api/types.js";
 import { ENDPOINT_RECOVERY } from "../../src/api/endpoints.js";
+import { createMockClient } from "../helpers/mock-client.js";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -29,16 +29,6 @@ const RECOVERY_FIXTURE: RecoveryCollection = {
   ],
   next_token: "abc123",
 };
-
-// ---------------------------------------------------------------------------
-// Helper
-// ---------------------------------------------------------------------------
-
-function createMockClient(response: unknown): WhoopClient {
-  return {
-    get: vi.fn().mockResolvedValue(response),
-  } as unknown as WhoopClient;
-}
 
 // ---------------------------------------------------------------------------
 // Tests

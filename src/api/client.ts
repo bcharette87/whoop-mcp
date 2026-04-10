@@ -78,6 +78,12 @@ const MAX_RETRIES = 3;
 /** Base delay in milliseconds for exponential backoff (1s, 2s, 4s) */
 const BASE_RETRY_DELAY_MS = 1000;
 
+/** Default request timeout in milliseconds (30 seconds) */
+const REQUEST_TIMEOUT_MS = 30_000;
+
+/** Maximum Retry-After delay in milliseconds (1 minute) — caps server-controlled header */
+const MAX_RETRY_AFTER_MS = 60_000;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -91,7 +97,8 @@ function delay(ms: number): Promise<void> {
 
 /**
  * Parse the Retry-After header as seconds.
- * Returns the delay in milliseconds, or null if the header is missing/unparseable.
+ * Returns the delay in milliseconds (capped at MAX_RETRY_AFTER_MS),
+ * or null if the header is missing/unparseable.
  */
 function parseRetryAfter(response: Response): number | null {
   const header = response.headers.get("retry-after");
@@ -102,7 +109,7 @@ function parseRetryAfter(response: Response): number | null {
   if (Number.isNaN(seconds) || seconds < 0) {
     return null;
   }
-  return seconds * 1000;
+  return Math.min(seconds * 1000, MAX_RETRY_AFTER_MS);
 }
 
 // ---------------------------------------------------------------------------
@@ -127,6 +134,7 @@ export function createWhoopClient(options: WhoopClientOptions): WhoopClient {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
         },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
     } catch (error: unknown) {
       if (error instanceof WhoopApiError) {

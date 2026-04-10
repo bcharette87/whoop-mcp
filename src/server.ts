@@ -19,6 +19,23 @@ import { getRecoveryCollection } from "./tools/get-recovery.js";
 import { getSleepCollection } from "./tools/get-sleep.js";
 import { getWorkoutCollection } from "./tools/get-workout.js";
 import { getCycleCollection } from "./tools/get-cycle.js";
+import { readFileSync } from "node:fs";
+
+// ---------------------------------------------------------------------------
+// Package version
+// ---------------------------------------------------------------------------
+
+/** Read the version from package.json at startup */
+function getPackageVersion(): string {
+  try {
+    const pkg = JSON.parse(
+      readFileSync(new URL("../package.json", import.meta.url), "utf-8"),
+    ) as { version: string };
+    return pkg.version;
+  } catch {
+    return "0.0.0";
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Shared schemas
@@ -40,6 +57,9 @@ const collectionInputSchema = z.object({
     ),
   limit: z
     .number()
+    .int()
+    .min(1)
+    .max(25)
     .optional()
     .describe("Max records to return (1-25). Defaults to 10."),
   nextToken: z
@@ -72,7 +92,11 @@ function errorResponse(error: unknown): {
   let message: string;
 
   if (error instanceof WhoopApiError) {
-    message = `WHOOP API returned ${error.statusCode} ${error.statusText}`;
+    const bodyStr =
+      typeof error.body === "string"
+        ? error.body
+        : JSON.stringify(error.body);
+    message = `WHOOP API returned ${error.statusCode} ${error.statusText}: ${bodyStr}`;
   } else if (error instanceof WhoopAuthError) {
     message = error.message;
   } else if (error instanceof WhoopNetworkError) {
@@ -119,7 +143,7 @@ async function safeTool<T>(
 export function createWhoopServer(client: WhoopClient): McpServer {
   const server = new McpServer({
     name: "whoop-mcp",
-    version: "0.1.0",
+    version: getPackageVersion(),
   });
 
   // -------------------------------------------------------------------------
@@ -159,7 +183,7 @@ export function createWhoopServer(client: WhoopClient): McpServer {
       inputSchema: collectionInputSchema,
       annotations: { readOnlyHint: true },
     },
-    async (args: { start?: string; end?: string; limit?: number; nextToken?: string }) =>
+    async (args: z.infer<typeof collectionInputSchema>) =>
       safeTool(() => getRecoveryCollection(client, args)),
   );
 
@@ -174,7 +198,7 @@ export function createWhoopServer(client: WhoopClient): McpServer {
       inputSchema: collectionInputSchema,
       annotations: { readOnlyHint: true },
     },
-    async (args: { start?: string; end?: string; limit?: number; nextToken?: string }) =>
+    async (args: z.infer<typeof collectionInputSchema>) =>
       safeTool(() => getSleepCollection(client, args)),
   );
 
@@ -189,7 +213,7 @@ export function createWhoopServer(client: WhoopClient): McpServer {
       inputSchema: collectionInputSchema,
       annotations: { readOnlyHint: true },
     },
-    async (args: { start?: string; end?: string; limit?: number; nextToken?: string }) =>
+    async (args: z.infer<typeof collectionInputSchema>) =>
       safeTool(() => getWorkoutCollection(client, args)),
   );
 
@@ -204,7 +228,7 @@ export function createWhoopServer(client: WhoopClient): McpServer {
       inputSchema: collectionInputSchema,
       annotations: { readOnlyHint: true },
     },
-    async (args: { start?: string; end?: string; limit?: number; nextToken?: string }) =>
+    async (args: z.infer<typeof collectionInputSchema>) =>
       safeTool(() => getCycleCollection(client, args)),
   );
 

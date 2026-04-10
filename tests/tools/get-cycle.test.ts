@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { getCycleCollection } from "../../src/tools/get-cycle.js";
-import type { WhoopClient } from "../../src/api/client.js";
 import type { CycleCollection } from "../../src/api/types.js";
 import { ENDPOINT_CYCLE } from "../../src/api/endpoints.js";
+import { createMockClient } from "../helpers/mock-client.js";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -29,16 +29,6 @@ const CYCLE_FIXTURE: CycleCollection = {
   ],
   next_token: "cycle-page-2",
 };
-
-// ---------------------------------------------------------------------------
-// Helper
-// ---------------------------------------------------------------------------
-
-function createMockClient(response: unknown): WhoopClient {
-  return {
-    get: vi.fn().mockResolvedValue(response),
-  } as unknown as WhoopClient;
-}
 
 // ---------------------------------------------------------------------------
 // Tests

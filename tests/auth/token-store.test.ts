@@ -225,6 +225,58 @@ describe("loadTokens", () => {
 
     expect(loaded).toEqual(sampleTokens);
   });
+
+  it("returns null when file contains JSON with missing access_token", async () => {
+    const { writeFile } = await import("node:fs/promises");
+    const invalid = { refresh_token: "r", expires_at: 123, token_type: "Bearer" };
+    await writeFile(join(tempDir, "tokens.json"), JSON.stringify(invalid), "utf-8");
+
+    const loaded = await loadTokens(tempDir);
+    expect(loaded).toBeNull();
+  });
+
+  it("returns null when file contains JSON with missing refresh_token", async () => {
+    const { writeFile } = await import("node:fs/promises");
+    const invalid = { access_token: "a", expires_at: 123, token_type: "Bearer" };
+    await writeFile(join(tempDir, "tokens.json"), JSON.stringify(invalid), "utf-8");
+
+    const loaded = await loadTokens(tempDir);
+    expect(loaded).toBeNull();
+  });
+
+  it("returns null when file contains JSON with missing expires_at", async () => {
+    const { writeFile } = await import("node:fs/promises");
+    const invalid = { access_token: "a", refresh_token: "r", token_type: "Bearer" };
+    await writeFile(join(tempDir, "tokens.json"), JSON.stringify(invalid), "utf-8");
+
+    const loaded = await loadTokens(tempDir);
+    expect(loaded).toBeNull();
+  });
+
+  it("returns null when file contains JSON with wrong types", async () => {
+    const { writeFile } = await import("node:fs/promises");
+    const invalid = { access_token: 123, refresh_token: "r", expires_at: "not-a-number" };
+    await writeFile(join(tempDir, "tokens.json"), JSON.stringify(invalid), "utf-8");
+
+    const loaded = await loadTokens(tempDir);
+    expect(loaded).toBeNull();
+  });
+
+  it("returns null when file contains a JSON array instead of object", async () => {
+    const { writeFile } = await import("node:fs/promises");
+    await writeFile(join(tempDir, "tokens.json"), "[]", "utf-8");
+
+    const loaded = await loadTokens(tempDir);
+    expect(loaded).toBeNull();
+  });
+
+  it("returns null when file contains JSON null", async () => {
+    const { writeFile } = await import("node:fs/promises");
+    await writeFile(join(tempDir, "tokens.json"), "null", "utf-8");
+
+    const loaded = await loadTokens(tempDir);
+    expect(loaded).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

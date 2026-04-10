@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { getWorkoutCollection } from "../../src/tools/get-workout.js";
-import type { WhoopClient } from "../../src/api/client.js";
 import type { WorkoutCollection } from "../../src/api/types.js";
 import { ENDPOINT_WORKOUT } from "../../src/api/endpoints.js";
+import { createMockClient } from "../helpers/mock-client.js";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -43,16 +43,6 @@ const WORKOUT_FIXTURE: WorkoutCollection = {
   ],
   next_token: "workout-page-2",
 };
-
-// ---------------------------------------------------------------------------
-// Helper
-// ---------------------------------------------------------------------------
-
-function createMockClient(response: unknown): WhoopClient {
-  return {
-    get: vi.fn().mockResolvedValue(response),
-  } as unknown as WhoopClient;
-}
 
 // ---------------------------------------------------------------------------
 // Tests
