@@ -10,6 +10,8 @@ import type {
   SleepCollection,
   Cycle,
   CycleCollection,
+  Workout,
+  WorkoutCollection,
 } from "../../src/api/types.js";
 
 describe("shared types", () => {
@@ -272,5 +274,99 @@ describe("cycle types", () => {
 
     expect(collection.records).toHaveLength(1);
     expect(collection.records[0]?.score_state).toBe("UNSCORABLE");
+  });
+});
+
+describe("workout types", () => {
+  it("accepts a scored workout with zone durations and optional distance", () => {
+    const workout: Workout = {
+      id: "ecfc6a15-4661-442f-a9a4-f160dd7afae8",
+      user_id: 9012,
+      created_at: "2022-04-24T11:25:44.774Z",
+      updated_at: "2022-04-24T14:25:44.774Z",
+      start: "2022-04-24T02:25:44.774Z",
+      end: "2022-04-24T10:25:44.774Z",
+      timezone_offset: "-05:00",
+      sport_name: "running",
+      score_state: "SCORED",
+      score: {
+        strain: 8.2463,
+        average_heart_rate: 123,
+        max_heart_rate: 146,
+        kilojoule: 1569.34033203125,
+        percent_recorded: 100.0,
+        distance_meter: 1772.77035916,
+        altitude_gain_meter: 46.64384460449,
+        altitude_change_meter: -0.781372010707855,
+        zone_durations: {
+          zone_zero_milli: 300000,
+          zone_one_milli: 600000,
+          zone_two_milli: 900000,
+          zone_three_milli: 900000,
+          zone_four_milli: 600000,
+          zone_five_milli: 300000,
+        },
+      },
+    };
+
+    expect(workout.sport_name).toBe("running");
+    expect(workout.score?.strain).toBeCloseTo(8.246);
+    expect(workout.score?.zone_durations.zone_five_milli).toBe(300000);
+    expect(workout.score?.distance_meter).toBeCloseTo(1772.77);
+  });
+
+  it("accepts a workout without optional fields", () => {
+    const workout: Workout = {
+      id: "ecfc6a15-4661-442f-a9a4-f160dd7afae8",
+      user_id: 9012,
+      created_at: "2022-04-24T11:25:44.774Z",
+      updated_at: "2022-04-24T14:25:44.774Z",
+      start: "2022-04-24T02:25:44.774Z",
+      end: "2022-04-24T10:25:44.774Z",
+      timezone_offset: "-05:00",
+      sport_name: "cycling",
+      score_state: "PENDING_SCORE",
+    };
+
+    expect(workout.score).toBeUndefined();
+    expect(workout.v1_id).toBeUndefined();
+    expect(workout.sport_id).toBeUndefined();
+  });
+
+  it("accepts a paginated workout collection", () => {
+    const collection: WorkoutCollection = {
+      records: [
+        {
+          id: "ecfc6a15-4661-442f-a9a4-f160dd7afae8",
+          user_id: 9012,
+          created_at: "2022-04-24T11:25:44.774Z",
+          updated_at: "2022-04-24T14:25:44.774Z",
+          start: "2022-04-24T02:25:44.774Z",
+          end: "2022-04-24T10:25:44.774Z",
+          timezone_offset: "-05:00",
+          sport_name: "running",
+          score_state: "SCORED",
+          score: {
+            strain: 8.2463,
+            average_heart_rate: 123,
+            max_heart_rate: 146,
+            kilojoule: 1569.34,
+            percent_recorded: 100.0,
+            zone_durations: {
+              zone_zero_milli: 300000,
+              zone_one_milli: 600000,
+              zone_two_milli: 900000,
+              zone_three_milli: 900000,
+              zone_four_milli: 600000,
+              zone_five_milli: 300000,
+            },
+          },
+        },
+      ],
+      next_token: "nextPage123",
+    };
+
+    expect(collection.records).toHaveLength(1);
+    expect(collection.next_token).toBe("nextPage123");
   });
 });

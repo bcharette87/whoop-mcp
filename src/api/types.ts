@@ -145,3 +145,49 @@ export interface Cycle {
 
 /** GET /v2/cycle — paginated */
 export type CycleCollection = PaginatedResponse<Cycle>;
+
+// ---------------------------------------------------------------------------
+// Workout types
+// ---------------------------------------------------------------------------
+
+/** Time spent in each heart rate zone during a workout */
+export interface ZoneDurations {
+  zone_zero_milli: number;
+  zone_one_milli: number;
+  zone_two_milli: number;
+  zone_three_milli: number;
+  zone_four_milli: number;
+  zone_five_milli: number;
+}
+
+/** Score details for a workout — only present when score_state is "SCORED" */
+export interface WorkoutScore {
+  strain: number;
+  average_heart_rate: number;
+  max_heart_rate: number;
+  kilojoule: number;
+  percent_recorded: number;
+  zone_durations: ZoneDurations;
+  distance_meter?: number;
+  altitude_gain_meter?: number;
+  altitude_change_meter?: number;
+}
+
+/** A single workout record (maps to OpenAPI WorkoutV2) */
+export interface Workout {
+  id: string;
+  user_id: number;
+  created_at: string;
+  updated_at: string;
+  start: string;
+  end: string;
+  timezone_offset: string;
+  sport_name: string;
+  score_state: ScoreState;
+  v1_id?: number;
+  score?: WorkoutScore;
+  sport_id?: number;
+}
+
+/** GET /v2/activity/workout — paginated */
+export type WorkoutCollection = PaginatedResponse<Workout>;
