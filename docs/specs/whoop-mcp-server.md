@@ -141,27 +141,31 @@ export const getRecoveryCollectionSchema = {
   description:
     "Get recovery scores for a date range. Returns HRV, resting heart rate, SpO2, and skin temp for each day.",
   inputSchema: z.object({
-    start_date: z
-      .string()
-      .describe("Start date in YYYY-MM-DD format"),
-    end_date: z
+    start: z
       .string()
       .optional()
-      .describe("End date in YYYY-MM-DD format. Defaults to today."),
+      .describe("Return recoveries after this time (inclusive). ISO 8601 format, e.g. 2026-04-01T00:00:00.000Z"),
+    end: z
+      .string()
+      .optional()
+      .describe("Return recoveries before this time (exclusive). ISO 8601 format. Defaults to now."),
+    limit: z
+      .number()
+      .optional()
+      .describe("Max records to return (1-25). Defaults to 10."),
   }),
 };
 
 export async function getRecoveryCollection(
   client: WhoopClient,
-  params: { start_date: string; end_date?: string }
+  params: { start?: string; end?: string; limit?: number }
 ): Promise<RecoveryCollection> {
   const searchParams = new URLSearchParams();
-  searchParams.set("start", params.start_date);
-  if (params.end_date) {
-    searchParams.set("end", params.end_date);
-  }
+  if (params.start) searchParams.set("start", params.start);
+  if (params.end) searchParams.set("end", params.end);
+  if (params.limit) searchParams.set("limit", String(params.limit));
   return client.get<RecoveryCollection>(
-    `/v1/recovery?${searchParams.toString()}`
+    `/v2/recovery?${searchParams.toString()}`
   );
 }
 ```
@@ -209,12 +213,12 @@ describe("get_recovery_collection", () => {
     } as unknown as WhoopClient;
 
     const result = await getRecoveryCollection(mockClient, {
-      start_date: "2026-04-01",
-      end_date: "2026-04-07",
+      start: "2026-04-01T00:00:00.000Z",
+      end: "2026-04-07T00:00:00.000Z",
     });
 
     expect(mockClient.get).toHaveBeenCalledWith(
-      "/v1/recovery?start=2026-04-01&end=2026-04-07"
+      "/v2/recovery?start=2026-04-01T00%3A00%3A00.000Z&end=2026-04-07T00%3A00%3A00.000Z"
     );
     expect(result.records).toHaveLength(1);
     expect(result.records[0].score.recovery_score).toBe(78);
@@ -246,16 +250,34 @@ describe("get_recovery_collection", () => {
 
 ## API Mapping — MCP Tools ↔ WHOOP Endpoints
 
-| MCP Tool | WHOOP Endpoint | Method | Key Parameters |
-|----------|---------------|--------|----------------|
-| `get_profile` | `/v1/user/profile/basic` | GET | — |
-| `get_recovery_collection` | `/v1/recovery` | GET | `start`, `end`, `nextToken` |
-| `get_sleep_collection` | `/v1/sleep` | GET | `start`, `end`, `nextToken` |
-| `get_workout_collection` | `/v1/workout` | GET | `start`, `end`, `nextToken` |
-| `get_cycle_collection` | `/v1/cycle` | GET | `start`, `end`, `nextToken` |
-| `get_body_measurement` | `/v1/body_measurement` | GET | — |
+> **Note:** WHOOP API uses **v2** endpoints. All date parameters use **ISO 8601 date-time** format (e.g., `2026-04-01T00:00:00.000Z`). Collection endpoints default to `limit=10` (max 25).
 
-All collection endpoints support pagination via `nextToken`. For MVP, fetch the first page only (most recent data). Pagination support can be added in V2.
+| MCP Tool | WHOOP Endpoint | Method | Key Parameters | OAuth Scope |
+|----------|---------------|--------|----------------|-------------|
+| `get_profile` | `/v2/user/profile/basic` | GET | — | `read:profile` |
+| `get_recovery_collection` | `/v2/recovery` | GET | `limit`, `start`, `end`, `nextToken` | `read:recovery` |
+| `get_sleep_collection` | `/v2/activity/sleep` | GET | `limit`, `start`, `end`, `nextToken` | `read:sleep` |
+| `get_workout_collection` | `/v2/activity/workout` | GET | `limit`, `start`, `end`, `nextToken` | `read:workout` |
+| `get_cycle_collection` | `/v2/cycle` | GET | `limit`, `start`, `end`, `nextToken` | `read:cycles` |
+| `get_body_measurement` | `/v2/user/measurement/body` | GET | — | `read:body_measurement` |
+
+All collection endpoints support pagination via `nextToken`. For MVP, fetch up to 25 records per call. Automatic pagination can be added in V2.
+
+### WHOOP API Base URL
+```
+https://api.prod.whoop.com/developer
+```
+
+### OAuth URLs
+```
+Authorization: https://api.prod.whoop.com/oauth/oauth2/auth
+Token:         https://api.prod.whoop.com/oauth/oauth2/token
+```
+
+### Required Scopes
+```
+read:recovery read:cycles read:workout read:sleep read:profile read:body_measurement
+```
 
 ## OAuth2 Flow
 
@@ -305,6 +327,6 @@ WHOOP_REDIRECT_URI=http://localhost:3000/callback
 
 ## Open Questions
 - Does WHOOP's OAuth require PKCE or is plain Authorization Code sufficient?
-- What OAuth scopes are needed? (Likely: `read:recovery`, `read:sleep`, `read:workout`, `read:cycles`, `read:profile`, `read:body_measurement`)
-- What's the rate limit? (Need to know for error handling strategy)
+- What's the rate limit? (API returns 429 — need to know threshold for retry strategy)
 - Is `zod` already a peer dependency of `@modelcontextprotocol/sdk` or do we need to add it separately?
+- What are the exact token lifetimes for access and refresh tokens?
