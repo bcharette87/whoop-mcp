@@ -158,64 +158,77 @@ export async function getRecoveryCollection(
 
 ## Implementation Status
 
-> **Current phase:** Tasks 1–2 complete — scaffold + API types in place.
-> **Next task:** Task 3 — Token Store (`src/auth/token-store.ts`)
-> **Plan:** `docs/plans/task-3-token-store.md`
+> **Current phase:** Tasks 1–3 complete — scaffold, API types, and token store in place.
+> **Next task:** Task 4 — API Client (`src/api/client.ts`)
+> **Plan:** `docs/plans/task-4-api-client.md`
 > **Spec:** `docs/specs/whoop-mcp-server.md`
 > **Implementation plan:** `docs/specs/implementation-plan.md`
 
-## Active Task Context: Task 3 — Token Store
+## Active Task Context: Task 4 — API Client
 
 ### What We're Building
-File-based OAuth token storage at `~/.whoop-mcp/tokens.json`. Pure I/O module: save, load, delete tokens + expiry check. No dependencies on API client or OAuth — they depend on it.
+Thin HTTP client wrapper around native `fetch` for the WHOOP REST API. Injects OAuth Bearer token, prepends base URL, parses JSON, throws typed errors on non-2xx. No retry/re-auth — that's Task 8.
 
-### Token Shape
+### API Surface
 ```typescript
-interface OAuthTokens {
-  access_token: string;
-  refresh_token: string;
-  expires_at: number;    // Unix epoch milliseconds (computed: Date.now() + expires_in * 1000)
-  token_type: string;    // Typically "Bearer"
+interface WhoopClientOptions {
+  accessToken: string;
+  baseUrl?: string;        // defaults to WHOOP_API_BASE_URL — override for tests
 }
+
+interface WhoopClient {
+  get<T>(path: string): Promise<T>;
+}
+
+class WhoopApiError extends Error {
+  statusCode: number;
+  statusText: string;
+  body: unknown;
+}
+
+function createWhoopClient(options: WhoopClientOptions): WhoopClient;
 ```
 
 ### Files to Create
-- `src/auth/token-store.ts` — exports: `OAuthTokens` type, `isTokenExpired()`, `saveTokens()`, `loadTokens()`, `deleteTokens()`
-- `tests/auth/token-store.test.ts` — tests for all of the above
+- `src/api/client.ts` — exports: `WhoopClient`, `WhoopClientOptions`, `WhoopApiError`, `createWhoopClient`
+- `tests/api/client.test.ts` — tests for all of the above
 
 ### Key Design Decisions
-- **`expires_at` (absolute ms)** not `expires_in` (relative) — makes expiry check a pure comparison
-- **60-second buffer** on expiry — tokens considered expired 60s early to avoid mid-request failures
-- **Directory `0700`, file `0600`** — security requirement (user-only access)
-- **`loadTokens()` returns `null`** on missing file or invalid JSON — never throws
-- **`deleteTokens()` is a no-op** if file doesn't exist — never throws
-- **All functions accept optional `tokenDir`** override for testing (default: `~/.whoop-mcp/`)
-- **Functional style** — no classes, named exports only
-- **Tests use temp directories** — never touch `~/.whoop-mcp/`
+- **Functional factory** `createWhoopClient()` returns `WhoopClient` object — no class for the client itself
+- **`WhoopApiError` is a class** — enables `instanceof` checks, carries `statusCode`, `statusText`, `body`
+- **`get<T>(path)`** is the only method — all 6 WHOOP endpoints are GET-only
+- **Base URL prepended** — paths like `/v2/recovery` are relative, client adds `WHOOP_API_BASE_URL`
+- **Token at construction** — `accessToken` passed once; new client created after refresh
+- **No retry in MVP** — 429/401 handling is Task 8; the client just throws `WhoopApiError`
+- **`baseUrl` override** — tests set a custom base URL to avoid prod URL in assertions
 
 ### Subtask Order (TDD — tests first)
-1. **3a:** `OAuthTokens` interface + `isTokenExpired()` pure function + tests
-2. **3b:** `saveTokens()` + tests (creates dir 0700, writes file 0600)
-3. **3c:** `loadTokens()` + tests (returns null on missing/malformed, round-trip with save)
-4. **3d:** `deleteTokens()` + tests (removes file, no-op if missing)
-5. **3e:** Verify `tokenDir` override works, full pipeline green
+1. **4a:** `WhoopApiError` class + tests (extends Error, carries structured data)
+2. **4b:** `createWhoopClient()` + `get<T>()` happy path + tests (mocked fetch, auth header, JSON parse)
+3. **4c:** Error handling for non-2xx + tests (401, 429, 500 → throw WhoopApiError)
+4. **4d:** Edge cases + tests (network error, non-JSON error body, exports verification)
+5. **4e:** Full pipeline green
+
+### Dependencies (already complete)
+- `src/api/endpoints.ts` ✅ — `WHOOP_API_BASE_URL` constant
+- `src/api/types.ts` ✅ — response types used as `T` in `get<T>()`
+- `src/auth/token-store.ts` ✅ — `OAuthTokens.access_token` passed to client at creation
 
 ### Consumed By (don't build these yet)
-- `src/auth/oauth.ts` (Task 5) — saves/reads tokens after auth flow
-- `src/api/client.ts` (Task 4) — reads access_token for Authorization header
-- `src/index.ts` (Task 9) — checks if tokens exist on startup
+- `src/tools/*.ts` (Task 7a-7f) — `client.get<RecoveryCollection>(path)`
+- `src/api/client.ts` (Task 8) — adds retry/re-auth wrapping
+- `src/auth/oauth.ts` (Task 5) — may use client for token exchange
 
 ### Gotchas
-- Use `node:fs/promises` (not `fs`) for async I/O
-- Use `node:os` for `homedir()`, `node:path` for `join()`
-- `isTokenExpired()` must be testable with fixed timestamps — accept optional `now` param or use `vi.useFakeTimers()`
-- File permission tests: use `fs.stat()` to verify, may behave differently on CI
-- Clean up temp dirs in `afterEach` with `fs.rm(dir, { recursive: true })`
+- Mock `fetch` with `vi.stubGlobal("fetch", vi.fn())` — works with Node 18+ native fetch
+- Error body: try `response.json()`, fall back to `response.text()` — WHOOP may return non-JSON errors
+- Don't import token-store — the access token string is passed in, keeping client decoupled
+- Spec example shows `WhoopClient` used as a type in tool signatures — match that interface shape
 
 ### Verification
 ```bash
-npm test -- tests/auth/token-store.test.ts  # After each subtask
-npm test && npm run typecheck && npm run lint && npm run build  # After 3e (final)
+npm test -- tests/api/client.test.ts       # After each subtask
+npm test && npm run typecheck && npm run lint && npm run build  # After 4e (final)
 ```
 
 ## Implementation Order
