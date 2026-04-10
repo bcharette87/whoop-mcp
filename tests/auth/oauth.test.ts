@@ -5,15 +5,18 @@
  * callback-server, and token-store as needed.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   buildAuthorizationUrl,
+  exchangeCodeForTokens,
   type OAuthConfig,
+  type TokenResponse,
 } from "../../src/auth/oauth.js";
 import {
   WHOOP_AUTH_URL,
   WHOOP_REDIRECT_URI,
   WHOOP_REQUIRED_SCOPES,
+  WHOOP_TOKEN_URL,
 } from "../../src/api/endpoints.js";
 
 // ---------------------------------------------------------------------------
@@ -76,5 +79,125 @@ describe("buildAuthorizationUrl", () => {
     // Should not throw when parsed
     const url = new URL(urlString);
     expect(url.searchParams.get("state")).toBe("state with spaces");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// exchangeCodeForTokens
+// ---------------------------------------------------------------------------
+
+const MOCK_TOKEN_RESPONSE: TokenResponse = {
+  access_token: "access-token-123",
+  refresh_token: "refresh-token-456",
+  expires_in: 3600,
+  token_type: "Bearer",
+  scope: WHOOP_REQUIRED_SCOPES,
+};
+
+describe("exchangeCodeForTokens", () => {
+  let mockFetch: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    mockFetch = vi.fn();
+    vi.stubGlobal("fetch", mockFetch);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("POSTs to WHOOP_TOKEN_URL with application/x-www-form-urlencoded", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(MOCK_TOKEN_RESPONSE),
+    });
+
+    await exchangeCodeForTokens("auth-code", TEST_CONFIG);
+
+    expect(mockFetch).toHaveBeenCalledOnce();
+    const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(WHOOP_TOKEN_URL);
+    expect(options.method).toBe("POST");
+    expect(options.headers).toEqual(
+      expect.objectContaining({
+        "Content-Type": "application/x-www-form-urlencoded",
+      }),
+    );
+  });
+
+  it("includes grant_type, code, client_id, client_secret, and redirect_uri in the body", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(MOCK_TOKEN_RESPONSE),
+    });
+
+    await exchangeCodeForTokens("auth-code-xyz", TEST_CONFIG);
+
+    const [, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const body = new URLSearchParams(options.body as string);
+    expect(body.get("grant_type")).toBe("authorization_code");
+    expect(body.get("code")).toBe("auth-code-xyz");
+    expect(body.get("client_id")).toBe("test-client-id");
+    expect(body.get("client_secret")).toBe("test-client-secret");
+    expect(body.get("redirect_uri")).toBe(WHOOP_REDIRECT_URI);
+  });
+
+  it("uses custom redirect_uri from config", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(MOCK_TOKEN_RESPONSE),
+    });
+
+    const config: OAuthConfig = {
+      ...TEST_CONFIG,
+      redirectUri: "http://localhost:9999/custom",
+    };
+    await exchangeCodeForTokens("code", config);
+
+    const [, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const body = new URLSearchParams(options.body as string);
+    expect(body.get("redirect_uri")).toBe("http://localhost:9999/custom");
+  });
+
+  it("returns the parsed TokenResponse on success", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(MOCK_TOKEN_RESPONSE),
+    });
+
+    const result = await exchangeCodeForTokens("code", TEST_CONFIG);
+    expect(result).toEqual(MOCK_TOKEN_RESPONSE);
+  });
+
+  it("throws a descriptive error on non-2xx response", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: () =>
+        Promise.resolve({
+          error: "invalid_grant",
+          error_description: "Authorization code expired",
+        }),
+    });
+
+    await expect(
+      exchangeCodeForTokens("expired-code", TEST_CONFIG),
+    ).rejects.toThrow(/token exchange failed.*400/i);
+  });
+
+  it("includes error_description in the thrown error when available", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: () =>
+        Promise.resolve({
+          error: "invalid_grant",
+          error_description: "Code has been used already",
+        }),
+    });
+
+    await expect(
+      exchangeCodeForTokens("used-code", TEST_CONFIG),
+    ).rejects.toThrow(/Code has been used already/);
   });
 });

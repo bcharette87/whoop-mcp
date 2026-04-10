@@ -7,6 +7,7 @@
 
 import {
   WHOOP_AUTH_URL,
+  WHOOP_TOKEN_URL,
   WHOOP_REDIRECT_URI,
   WHOOP_REQUIRED_SCOPES,
 } from "../api/endpoints.js";
@@ -59,4 +60,49 @@ export function buildAuthorizationUrl(
   url.searchParams.set("state", state);
 
   return url.toString();
+}
+
+// ---------------------------------------------------------------------------
+// exchangeCodeForTokens
+// ---------------------------------------------------------------------------
+
+/**
+ * Exchange an authorization code for tokens.
+ *
+ * POSTs to the WHOOP token endpoint with `application/x-www-form-urlencoded`
+ * body per OAuth2 spec.
+ */
+export async function exchangeCodeForTokens(
+  code: string,
+  config: OAuthConfig,
+): Promise<TokenResponse> {
+  const body = new URLSearchParams({
+    grant_type: "authorization_code",
+    code,
+    client_id: config.clientId,
+    client_secret: config.clientSecret,
+    redirect_uri: config.redirectUri ?? WHOOP_REDIRECT_URI,
+  });
+
+  const response = await fetch(WHOOP_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+  });
+
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => ({}))) as Record<
+      string,
+      unknown
+    >;
+    const description =
+      typeof errorBody.error_description === "string"
+        ? errorBody.error_description
+        : "unknown error";
+    throw new Error(
+      `Token exchange failed (${response.status}): ${description}`,
+    );
+  }
+
+  return (await response.json()) as TokenResponse;
 }
