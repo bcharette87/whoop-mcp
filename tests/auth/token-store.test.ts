@@ -4,7 +4,7 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { OAuthTokens } from "../../src/auth/token-store.js";
-import { isTokenExpired, saveTokens } from "../../src/auth/token-store.js";
+import { isTokenExpired, saveTokens, loadTokens } from "../../src/auth/token-store.js";
 
 // ---------------------------------------------------------------------------
 // Task 3a: Token types + expiry check
@@ -167,5 +167,62 @@ describe("saveTokens", () => {
     const raw = await readFile(join(tempDir, "tokens.json"), "utf-8");
     const parsed = JSON.parse(raw) as OAuthTokens;
     expect(parsed.access_token).toBe("new_access");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 3c: Load tokens from disk
+// ---------------------------------------------------------------------------
+
+describe("loadTokens", () => {
+  let tempDir: string;
+
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), "whoop-mcp-test-"));
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true });
+  });
+
+  const sampleTokens: OAuthTokens = {
+    access_token: "access_abc",
+    refresh_token: "refresh_xyz",
+    expires_at: Date.now() + 3600_000,
+    token_type: "Bearer",
+  };
+
+  it("returns parsed OAuthTokens when file exists with valid JSON", async () => {
+    await saveTokens(sampleTokens, tempDir);
+
+    const loaded = await loadTokens(tempDir);
+
+    expect(loaded).not.toBeNull();
+    expect(loaded!.access_token).toBe("access_abc");
+    expect(loaded!.refresh_token).toBe("refresh_xyz");
+    expect(loaded!.token_type).toBe("Bearer");
+    expect(loaded!.expires_at).toBe(sampleTokens.expires_at);
+  });
+
+  it("returns null when file does not exist", async () => {
+    const loaded = await loadTokens(tempDir);
+
+    expect(loaded).toBeNull();
+  });
+
+  it("returns null when file contains invalid JSON", async () => {
+    const { writeFile } = await import("node:fs/promises");
+    await writeFile(join(tempDir, "tokens.json"), "not valid json{{{", "utf-8");
+
+    const loaded = await loadTokens(tempDir);
+
+    expect(loaded).toBeNull();
+  });
+
+  it("round-trips: saveTokens then loadTokens returns same data", async () => {
+    await saveTokens(sampleTokens, tempDir);
+    const loaded = await loadTokens(tempDir);
+
+    expect(loaded).toEqual(sampleTokens);
   });
 });
