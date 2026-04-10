@@ -164,6 +164,60 @@ export async function getRecoveryCollection(
 > **Spec:** `docs/specs/whoop-mcp-server.md`
 > **Implementation plan:** `docs/specs/implementation-plan.md`
 
+## Active Task Context: Task 3 — Token Store
+
+### What We're Building
+File-based OAuth token storage at `~/.whoop-mcp/tokens.json`. Pure I/O module: save, load, delete tokens + expiry check. No dependencies on API client or OAuth — they depend on it.
+
+### Token Shape
+```typescript
+interface OAuthTokens {
+  access_token: string;
+  refresh_token: string;
+  expires_at: number;    // Unix epoch milliseconds (computed: Date.now() + expires_in * 1000)
+  token_type: string;    // Typically "Bearer"
+}
+```
+
+### Files to Create
+- `src/auth/token-store.ts` — exports: `OAuthTokens` type, `isTokenExpired()`, `saveTokens()`, `loadTokens()`, `deleteTokens()`
+- `tests/auth/token-store.test.ts` — tests for all of the above
+
+### Key Design Decisions
+- **`expires_at` (absolute ms)** not `expires_in` (relative) — makes expiry check a pure comparison
+- **60-second buffer** on expiry — tokens considered expired 60s early to avoid mid-request failures
+- **Directory `0700`, file `0600`** — security requirement (user-only access)
+- **`loadTokens()` returns `null`** on missing file or invalid JSON — never throws
+- **`deleteTokens()` is a no-op** if file doesn't exist — never throws
+- **All functions accept optional `tokenDir`** override for testing (default: `~/.whoop-mcp/`)
+- **Functional style** — no classes, named exports only
+- **Tests use temp directories** — never touch `~/.whoop-mcp/`
+
+### Subtask Order (TDD — tests first)
+1. **3a:** `OAuthTokens` interface + `isTokenExpired()` pure function + tests
+2. **3b:** `saveTokens()` + tests (creates dir 0700, writes file 0600)
+3. **3c:** `loadTokens()` + tests (returns null on missing/malformed, round-trip with save)
+4. **3d:** `deleteTokens()` + tests (removes file, no-op if missing)
+5. **3e:** Verify `tokenDir` override works, full pipeline green
+
+### Consumed By (don't build these yet)
+- `src/auth/oauth.ts` (Task 5) — saves/reads tokens after auth flow
+- `src/api/client.ts` (Task 4) — reads access_token for Authorization header
+- `src/index.ts` (Task 9) — checks if tokens exist on startup
+
+### Gotchas
+- Use `node:fs/promises` (not `fs`) for async I/O
+- Use `node:os` for `homedir()`, `node:path` for `join()`
+- `isTokenExpired()` must be testable with fixed timestamps — accept optional `now` param or use `vi.useFakeTimers()`
+- File permission tests: use `fs.stat()` to verify, may behave differently on CI
+- Clean up temp dirs in `afterEach` with `fs.rm(dir, { recursive: true })`
+
+### Verification
+```bash
+npm test -- tests/auth/token-store.test.ts  # After each subtask
+npm test && npm run typecheck && npm run lint && npm run build  # After 3e (final)
+```
+
 ## Implementation Order
 
 1. Project scaffold (package.json, tsconfig, eslint, vitest)
