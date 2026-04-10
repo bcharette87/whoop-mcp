@@ -53,10 +53,10 @@ npm run dev         # Dev mode (tsx)
 - **OAuth:** Authorization Code flow, tokens at `~/.whoop-mcp/tokens.json` (0600 perms)
 
 ## Implementation Status
-- Tasks 1–6 complete (scaffold, types, token store, API client, OAuth, MCP server shell)
-- 114 tests passing, typecheck clean, build clean
-- **Next:** Task 7 — Tool implementations (7a–7f)
-- After that: Task 8 (error handling), Task 9 (entry point), Task 10 (docs)
+- Tasks 1–8 complete (scaffold, types, token store, API client, OAuth, MCP server shell, tool implementations, error handling)
+- 169 tests passing, typecheck clean, build clean, lint clean
+- **Next:** Task 9 — Entry point + CLI (`src/index.ts`)
+- After that: Task 10 (docs + publish prep)
 
 ## Boundaries
 - **Always:** Run tests before commits, validate input with Zod, store tokens securely (0600)
