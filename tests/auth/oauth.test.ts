@@ -10,6 +10,7 @@ import {
   buildAuthorizationUrl,
   exchangeCodeForTokens,
   refreshAccessToken,
+  toOAuthTokens,
   type OAuthConfig,
   type TokenResponse,
 } from "../../src/auth/oauth.js";
@@ -295,5 +296,49 @@ describe("refreshAccessToken", () => {
     await expect(
       refreshAccessToken("revoked-token", TEST_CONFIG),
     ).rejects.toThrow(/Refresh token revoked/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// toOAuthTokens
+// ---------------------------------------------------------------------------
+
+describe("toOAuthTokens", () => {
+  it("computes expires_at from expires_in (seconds → epoch ms)", () => {
+    const NOW = 1_700_000_000_000;
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const result = toOAuthTokens(MOCK_TOKEN_RESPONSE);
+
+    expect(result.expires_at).toBe(NOW + 3600 * 1000);
+
+    vi.restoreAllMocks();
+  });
+
+  it("copies access_token, refresh_token, and token_type directly", () => {
+    vi.spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
+
+    const result = toOAuthTokens(MOCK_TOKEN_RESPONSE);
+
+    expect(result.access_token).toBe("access-token-123");
+    expect(result.refresh_token).toBe("refresh-token-456");
+    expect(result.token_type).toBe("Bearer");
+
+    vi.restoreAllMocks();
+  });
+
+  it("returns the correct shape matching OAuthTokens", () => {
+    vi.spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
+
+    const result = toOAuthTokens(MOCK_TOKEN_RESPONSE);
+
+    expect(result).toEqual({
+      access_token: "access-token-123",
+      refresh_token: "refresh-token-456",
+      expires_at: 1_700_000_000_000 + 3600 * 1000,
+      token_type: "Bearer",
+    });
+
+    vi.restoreAllMocks();
   });
 });

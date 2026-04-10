@@ -5,6 +5,7 @@
  * → exchange code for tokens → save to token store. Also handles token refresh.
  */
 
+import type { OAuthTokens } from "./token-store.js";
 import {
   WHOOP_AUTH_URL,
   WHOOP_TOKEN_URL,
@@ -148,4 +149,22 @@ export async function refreshAccessToken(
   }
 
   return (await response.json()) as TokenResponse;
+}
+
+// ---------------------------------------------------------------------------
+// toOAuthTokens
+// ---------------------------------------------------------------------------
+
+/**
+ * Convert the raw TokenResponse into our OAuthTokens shape for storage.
+ *
+ * Computes `expires_at` (absolute epoch ms) from `expires_in` (relative seconds).
+ */
+export function toOAuthTokens(response: TokenResponse): OAuthTokens {
+  return {
+    access_token: response.access_token,
+    refresh_token: response.refresh_token,
+    expires_at: Date.now() + response.expires_in * 1000,
+    token_type: response.token_type,
+  };
 }
