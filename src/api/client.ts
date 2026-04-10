@@ -55,6 +55,43 @@ export class WhoopNetworkError extends Error {
 }
 
 // ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+/** Maximum number of retries for 429 rate limit responses */
+const MAX_RETRIES = 3;
+
+/** Base delay in milliseconds for exponential backoff (1s, 2s, 4s) */
+const BASE_RETRY_DELAY_MS = 1000;
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Wait for a given number of milliseconds.
+ */
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Parse the Retry-After header as seconds.
+ * Returns the delay in milliseconds, or null if the header is missing/unparseable.
+ */
+function parseRetryAfter(response: Response): number | null {
+  const header = response.headers.get("retry-after");
+  if (header === null) {
+    return null;
+  }
+  const seconds = Number(header);
+  if (Number.isNaN(seconds) || seconds < 0) {
+    return null;
+  }
+  return seconds * 1000;
+}
+
+// ---------------------------------------------------------------------------
 // Client factory
 // ---------------------------------------------------------------------------
 
@@ -62,43 +99,78 @@ export class WhoopNetworkError extends Error {
  * Create a WHOOP API client.
  *
  * The client prepends the base URL to all paths, injects the Bearer token,
- * and parses JSON responses. Throws `WhoopApiError` on non-2xx responses.
+ * parses JSON responses, retries 429 rate limit responses with backoff,
+ * and throws typed errors for non-2xx status codes.
  */
 export function createWhoopClient(options: WhoopClientOptions): WhoopClient {
   const baseUrl = options.baseUrl ?? WHOOP_API_BASE_URL;
 
+  async function doFetch(url: string, accessToken: string): Promise<Response> {
+    try {
+      return await fetch(url, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      });
+    } catch (error: unknown) {
+      if (error instanceof WhoopApiError) {
+        throw error;
+      }
+      throw new WhoopNetworkError(error);
+    }
+  }
+
+  async function parseErrorBody(response: Response): Promise<unknown> {
+    try {
+      return await response.json();
+    } catch {
+      return await response.text();
+    }
+  }
+
   return {
     async get<T>(path: string): Promise<T> {
       const url = `${baseUrl}${path}`;
+      let lastError: WhoopApiError | undefined;
+      let lastResponse: Response | undefined;
 
-      let response: Response;
-      try {
-        response = await fetch(url, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${options.accessToken}`,
-            "Content-Type": "application/json",
-          },
-        });
-      } catch (error: unknown) {
-        // Don't wrap WhoopApiError — only wrap network-level errors
-        if (error instanceof WhoopApiError) {
-          throw error;
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        // Wait before retry (not before the first attempt)
+        if (attempt > 0 && lastResponse) {
+          const retryDelay =
+            parseRetryAfter(lastResponse) ??
+            BASE_RETRY_DELAY_MS * Math.pow(2, attempt - 1);
+          await delay(retryDelay);
         }
-        throw new WhoopNetworkError(error);
+
+        const response = await doFetch(url, options.accessToken);
+
+        if (response.ok) {
+          return (await response.json()) as T;
+        }
+
+        const body = await parseErrorBody(response);
+        const apiError = new WhoopApiError(
+          response.status,
+          response.statusText,
+          body,
+        );
+
+        // Only retry on 429 rate limit
+        if (response.status === 429) {
+          lastError = apiError;
+          lastResponse = response;
+          continue;
+        }
+
+        // All other errors: throw immediately
+        throw apiError;
       }
 
-      if (!response.ok) {
-        let body: unknown;
-        try {
-          body = await response.json();
-        } catch {
-          body = await response.text();
-        }
-        throw new WhoopApiError(response.status, response.statusText, body);
-      }
-
-      return (await response.json()) as T;
+      // All retries exhausted
+      throw lastError!;
     },
   };
 }

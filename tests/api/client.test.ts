@@ -175,21 +175,41 @@ describe("createWhoopClient", () => {
       }
     });
 
-    it("throws WhoopApiError on 429 Too Many Requests", async () => {
-      mockFetch.mockResolvedValue(
-        mockErrorResponse(429, "Too Many Requests", { retry_after: 30 }),
-      );
+    it("throws WhoopApiError on 429 Too Many Requests (after retries)", async () => {
+      vi.useFakeTimers();
+      const response429 = {
+        ok: false,
+        status: 429,
+        statusText: "Too Many Requests",
+        headers: { get: () => null },
+        json: () => Promise.resolve({ retry_after: 30 }),
+        text: () => Promise.resolve("rate limited"),
+      } as unknown as Response;
+      mockFetch
+        .mockResolvedValueOnce(response429)
+        .mockResolvedValueOnce(response429)
+        .mockResolvedValueOnce(response429)
+        .mockResolvedValueOnce(response429);
       const client = createWhoopClient({ accessToken: TEST_TOKEN, baseUrl: TEST_BASE_URL });
 
-      await expect(client.get("/v2/recovery")).rejects.toThrow(WhoopApiError);
+      const promise = client.get("/v2/recovery");
+      // Prevent PromiseRejectionHandledWarning — rejection is handled below
+      promise.catch(() => {});
+      // Advance through all retries
+      await vi.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(2000);
+      await vi.advanceTimersByTimeAsync(4000);
 
       try {
-        await client.get("/v2/recovery");
+        await promise;
+        expect.fail("should have thrown");
       } catch (error) {
+        expect(error).toBeInstanceOf(WhoopApiError);
         const apiError = error as WhoopApiError;
         expect(apiError.statusCode).toBe(429);
         expect(apiError.body).toEqual({ retry_after: 30 });
       }
+      vi.useRealTimers();
     });
 
     it("throws WhoopApiError on 500 Internal Server Error", async () => {
@@ -239,6 +259,163 @@ describe("createWhoopClient", () => {
         const apiError = error as WhoopApiError;
         expect(apiError.statusCode).toBe(503);
         expect(apiError.body).toBe(htmlBody);
+      }
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Task 8b: 429 retry with backoff
+  // -------------------------------------------------------------------------
+
+  describe("get (429 retry)", () => {
+    /** Helper to create a 429 response with optional Retry-After header */
+    function mock429Response(retryAfter?: string): Response {
+      const headers = new Map<string, string>();
+      if (retryAfter !== undefined) {
+        headers.set("retry-after", retryAfter);
+      }
+      return {
+        ok: false,
+        status: 429,
+        statusText: "Too Many Requests",
+        headers: { get: (name: string) => headers.get(name.toLowerCase()) ?? null },
+        json: () => Promise.resolve({ error: "rate_limited" }),
+        text: () => Promise.resolve("rate limited"),
+      } as unknown as Response;
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("retries on 429 and succeeds on 2nd attempt", async () => {
+      mockFetch
+        .mockResolvedValueOnce(mock429Response())
+        .mockResolvedValueOnce(mockJsonResponse({ user_id: 1 }));
+      const client = createWhoopClient({ accessToken: TEST_TOKEN, baseUrl: TEST_BASE_URL });
+
+      const promise = client.get<{ user_id: number }>("/v2/recovery");
+      await vi.advanceTimersByTimeAsync(1000);
+
+      const result = await promise;
+      expect(result.user_id).toBe(1);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("retries on 429 and succeeds on 3rd attempt", async () => {
+      mockFetch
+        .mockResolvedValueOnce(mock429Response())
+        .mockResolvedValueOnce(mock429Response())
+        .mockResolvedValueOnce(mockJsonResponse({ ok: true }));
+      const client = createWhoopClient({ accessToken: TEST_TOKEN, baseUrl: TEST_BASE_URL });
+
+      const promise = client.get("/v2/recovery");
+      await vi.advanceTimersByTimeAsync(1000); // 1st retry
+      await vi.advanceTimersByTimeAsync(2000); // 2nd retry
+
+      const result = await promise;
+      expect(result).toEqual({ ok: true });
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+    });
+
+    it("throws WhoopApiError after max retries exhausted", async () => {
+      mockFetch
+        .mockResolvedValueOnce(mock429Response())
+        .mockResolvedValueOnce(mock429Response())
+        .mockResolvedValueOnce(mock429Response())
+        .mockResolvedValueOnce(mock429Response());
+      const client = createWhoopClient({ accessToken: TEST_TOKEN, baseUrl: TEST_BASE_URL });
+
+      const promise = client.get("/v2/recovery");
+      // Prevent PromiseRejectionHandledWarning — rejection is handled below
+      promise.catch(() => {});
+      // Advance through all 3 retry delays: 1s, 2s, 4s
+      await vi.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(2000);
+      await vi.advanceTimersByTimeAsync(4000);
+
+      try {
+        await promise;
+        expect.fail("should have thrown");
+      } catch (error) {
+        expect(error).toBeInstanceOf(WhoopApiError);
+        expect((error as WhoopApiError).statusCode).toBe(429);
+      }
+      // 1 initial + 3 retries = 4 total calls
+      expect(mockFetch).toHaveBeenCalledTimes(4);
+    });
+
+    it("respects Retry-After header (seconds)", async () => {
+      mockFetch
+        .mockResolvedValueOnce(mock429Response("5"))
+        .mockResolvedValueOnce(mockJsonResponse({ ok: true }));
+      const client = createWhoopClient({ accessToken: TEST_TOKEN, baseUrl: TEST_BASE_URL });
+
+      const promise = client.get("/v2/recovery");
+
+      // Should not resolve before 5 seconds
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      // Should resolve after 5 seconds
+      await vi.advanceTimersByTimeAsync(1000);
+      const result = await promise;
+      expect(result).toEqual({ ok: true });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("does NOT retry on non-429 errors", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        statusText: "Internal Server Error",
+        json: () => Promise.resolve({ error: "server_error" }),
+        text: () => Promise.resolve("server error"),
+      } as unknown as Response);
+      const client = createWhoopClient({ accessToken: TEST_TOKEN, baseUrl: TEST_BASE_URL });
+
+      await expect(client.get("/v2/recovery")).rejects.toThrow(WhoopApiError);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("uses exponential backoff: 1s, 2s, 4s", async () => {
+      mockFetch
+        .mockResolvedValueOnce(mock429Response()) // initial call
+        .mockResolvedValueOnce(mock429Response()) // retry 1
+        .mockResolvedValueOnce(mock429Response()) // retry 2
+        .mockResolvedValueOnce(mock429Response()); // retry 3 (still fails)
+      const client = createWhoopClient({ accessToken: TEST_TOKEN, baseUrl: TEST_BASE_URL });
+
+      const promise = client.get("/v2/recovery");
+      // Prevent PromiseRejectionHandledWarning — rejection is handled below
+      promise.catch(() => {});
+
+      // After 999ms: only 1 call (initial)
+      await vi.advanceTimersByTimeAsync(999);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      // After 1s: retry 1 fires
+      await vi.advanceTimersByTimeAsync(1);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+
+      // After 2s more: retry 2 fires
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+
+      // After 4s more: retry 3 fires
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(mockFetch).toHaveBeenCalledTimes(4);
+
+      // All retries exhausted → throws
+      try {
+        await promise;
+        expect.fail("should have thrown");
+      } catch (error) {
+        expect(error).toBeInstanceOf(WhoopApiError);
       }
     });
   });
