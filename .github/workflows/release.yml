@@ -52,6 +52,7 @@ jobs:
             found { print }
           ' CHANGELOG.md)
           # Use a delimiter to handle multiline output
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "notes<<EOF" >> "$GITHUB_OUTPUT"
           echo "$NOTES" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
@@ -64,7 +65,7 @@ jobs:
 
             ---
 
-            📦 **npm:** [`whoop-ai-mcp@${{ github.ref_name }}`](https://www.npmjs.com/package/whoop-ai-mcp/v/${{ github.ref_name }})
+            📦 **npm:** [`whoop-ai-mcp@${{ github.ref_name }}`](https://www.npmjs.com/package/whoop-ai-mcp/v/${{ steps.changelog.outputs.version }})
 
             Install: `npm install -g whoop-ai-mcp` or use `npx whoop-ai-mcp`
           generate_release_notes: false

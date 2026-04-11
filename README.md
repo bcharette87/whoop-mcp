@@ -316,7 +316,7 @@ npx whoop-ai-mcp
 1. Update the version in `package.json` and add a new entry in `CHANGELOG.md`
 2. Commit the changes: `git commit -am "Release vX.Y.Z"`
 3. Tag the release: `git tag vX.Y.Z`
-4. Push the tag: `git push origin vX.Y.Z`
+4. Push the commit and tag: `git push origin main vX.Y.Z`
 5. The [Release workflow](.github/workflows/release.yml) automatically creates a GitHub Release with notes extracted from the changelog
 6. The [npm publish workflow](.github/workflows/npm-publish.yml) automatically publishes the new version to npm
 
