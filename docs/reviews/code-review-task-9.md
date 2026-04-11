@@ -145,12 +145,13 @@
 
 ## Action Items
 
-| # | Priority | Issue | Target |
-|---|----------|-------|--------|
-| 1 | **Critical** | Fix `isMainModule` symlink bug — use `realpathSync` | Hotfix before Task 10 |
-| 2 | Important | Remove misleading "cache clearing" comment in test | With fix #1 |
-| 3 | Important | Re-include `src/index.ts` in coverage (after fixing v8 compat) | Task 10 |
-| 4 | Important | Remove unused `mockGet` or document its purpose | With fix #1 |
-| 5 | Important | Resolve remaining checkpoint-1/2 items before publish | Before Task 10 |
-| 6 | Suggestion | Ensure README `#configuration` anchor exists | Task 10 |
-| 7 | Suggestion | Consider re-auth fallback when `loadTokens()` returns null | V2 backlog |
+| # | Priority | Issue | Target | GitHub |
+|---|----------|-------|--------|--------|
+| 1 | **Critical** | Fix `isMainModule` symlink bug — use `realpathSync` | Hotfix before Task 10 | ✅ Fixed in `7236b13` |
+| 2 | Important | Remove misleading "cache clearing" comment in test | With fix #1 | ✅ Fixed in `7236b13` |
+| 3 | Important | Re-include `src/index.ts` in coverage (after fixing v8 compat) | Task 10 | [#25](https://github.com/shashankswe2020-ux/whoop-mcp/issues/25) |
+| 4 | Important | Remove unused `mockGet` or document its purpose | With fix #1 | ✅ Fixed in `7236b13` |
+| 5 | Important | Resolve remaining checkpoint-1/2 items before publish | Before Task 10 | [#27](https://github.com/shashankswe2020-ux/whoop-mcp/issues/27) |
+| 6 | Important | Fix `@vitest/coverage-v8` version incompatibility | Before Task 10 | [#26](https://github.com/shashankswe2020-ux/whoop-mcp/issues/26) |
+| 7 | Suggestion | Ensure README `#configuration` anchor exists | Task 10 | [#28](https://github.com/shashankswe2020-ux/whoop-mcp/issues/28) |
+| 8 | Suggestion | Consider re-auth fallback when `loadTokens()` returns null | V2 backlog | — |
