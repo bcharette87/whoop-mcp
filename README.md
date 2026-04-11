@@ -1,4 +1,4 @@
-# whoop-mcp
+# whoop-ai-mcp
 
 [![npm version](https://img.shields.io/npm/v/whoop-ai-mcp.svg)](https://www.npmjs.com/package/whoop-ai-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -194,7 +194,7 @@ Get physiological cycles for a date range. Returns strain, calories, and heart r
 
 ## Authentication
 
-`whoop-mcp` uses OAuth2 Authorization Code flow:
+`whoop-ai-mcp` uses OAuth2 Authorization Code flow:
 
 1. **First run:** A browser window opens for you to authorize with WHOOP
 2. **Token caching:** Access and refresh tokens are saved to `~/.whoop-mcp/tokens.json`

@@ -81,10 +81,10 @@ Dispatch `security-auditor` for a full security audit, plus verify:
 
 Invoke the `git-workflow-and-versioning` skill, then verify:
 
-- [ ] `package.json` has correct `bin` field: `"whoop-mcp": "dist/index.js"`
+- [ ] `package.json` has correct `bin` field: `"whoop-ai-mcp": "dist/index.js"`
 - [ ] `dist/index.js` has `#!/usr/bin/env node` shebang
 - [ ] `npm pack` produces a clean tarball (inspect contents)
-- [ ] `npx whoop-mcp` works from a clean install
+- [ ] `npx whoop-ai-mcp` works from a clean install
 - [ ] `package.json` has: name, version, description, keywords, repository, license, main, types
 
 ### Step 4: Integration
@@ -102,7 +102,7 @@ Test end-to-end integration:
     "mcpServers": {
       "whoop": {
         "command": "npx",
-        "args": ["whoop-mcp"],
+        "args": ["whoop-ai-mcp"],
         "env": {
           "WHOOP_CLIENT_ID": "your_client_id",
           "WHOOP_CLIENT_SECRET": "your_client_secret"
@@ -130,7 +130,7 @@ Invoke the `documentation-and-adrs` skill, then verify:
 3. After all checks pass, the package is ready for `npm publish`
 
 **Rollback plan:** If npm publish introduces issues:
-- `npm unpublish whoop-mcp@<version>` (within 72 hours)
+- `npm unpublish whoop-ai-mcp@<version>` (within 72 hours)
 - Or publish a patch version with the fix
 
 ---
