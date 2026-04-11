@@ -158,7 +158,10 @@ export async function getRecoveryCollection(
 
 ## Implementation Status
 
-> **Current phase:** All 10 tasks complete — scaffold, API types, token store, API client, OAuth flow, MCP server shell, all 6 tool implementations, error handling, entry point + CLI, and docs + publish prep. 202 tests passing, typecheck clean, build clean, lint clean. Ready for `npm publish`.
+> **Current phase:** All 10 tasks complete — scaffold, API types, token store, API client, OAuth flow, MCP server shell, all 6 tool implementations, error handling, entry point + CLI, and docs + publish prep. 202 tests passing, typecheck clean, build clean, lint clean.
+> ✅ **MCP Inspector tested** (2026-04-12) — OAuth grant flow + `get_profile` returning real data.
+> ✅ **Claude Desktop tested** (2026-04-12) — server connected, OAuth completed, tools accessible from chat.
+> **Ready for `npm publish`.**
 > **Plan:** `docs/specs/implementation-plan.md`
 > **Spec:** `docs/specs/whoop-mcp-server.md`
 > **Code review:** `docs/reviews/code-review-checkpoint-1.md` (Tasks 1–5 approved)

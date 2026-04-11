@@ -55,6 +55,8 @@ npm run dev         # Dev mode (tsx)
 ## Implementation Status
 - All 10 tasks complete (scaffold, types, token store, API client, OAuth, MCP server shell, tool implementations, error handling, entry point + CLI, docs + publish prep)
 - 202 tests passing, typecheck clean, build clean, lint clean
+- ✅ MCP Inspector integration tested 2026-04-12 — OAuth flow, `get_profile` tool returning real data
+- ✅ Claude Desktop integration tested 2026-04-12 — server connected, OAuth completed, tools accessible
 - Ready for `npm publish`
 
 ## Boundaries
