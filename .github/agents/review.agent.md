@@ -100,22 +100,11 @@ Invoke the `performance-optimization` skill if concerns arise:
 - No unnecessary API calls or redundant token refreshes?
 - Token refresh is atomic (no race conditions)?
 
-### Step 3: Create GitHub Issues for Tracked Items
+### Step 3: Dispatch Sub-Agents
 
-For every **Critical** or **Important** finding that is not fixed inline during the review, create a GitHub issue using the `gh` CLI:
-
-```bash
-gh issue create \
-  --title "[PRIORITY] Short description" \
-  --body "## Source\n- **Review:** \`docs/reviews/code-review-<scope>.md\`\n\n## Problem\n...\n\n## Fix\n..." \
-  --label "issue-by-code-review"
-```
-
-**Rules for issue creation:**
-- ✅ Fixed items → note the commit hash in the action items table, no issue needed
-- ⚠️ Tracked items (not fixed in this review) → **must** create a GitHub issue
-- Suggestions → create an issue only if substantial; otherwise just note in the review doc
-- Link issues back in the review's Action Items table (add a `GitHub` column with issue URLs)
+1. Dispatch `code-reviewer` to run the automated review and create GitHub issues
+2. If changes touch auth or security-sensitive areas, dispatch `security-auditor`
+3. If coverage concerns exist, dispatch `test-engineer` for coverage analysis
 
 ### Step 4: Categorize and Report
 
@@ -136,5 +125,4 @@ Save structured review to `docs/reviews/code-review-<scope>.md`
 5. Don't approve code with Critical issues
 6. Acknowledge what's done well — specific praise motivates good practices
 7. Always run verification commands — don't assume they pass
-8. **Create GitHub issues** (`gh issue create`) for all tracked (unfixed) Important+ findings — a finding without a tracking issue will be forgotten
-9. Save the review to `docs/reviews/` with issue links in the Action Items table
+8. Dispatch sub-agents for specialized analysis — don't do everything yourself
