@@ -10,17 +10,18 @@ import { startCallbackServer } from "../../src/auth/callback-server.js";
 describe("startCallbackServer", () => {
   describe("happy path", () => {
     it("resolves with code and state on a valid callback", async () => {
-      const port = 49152 + Math.floor(Math.random() * 1000);
       const expectedState = "random-state-123";
 
-      const resultPromise = startCallbackServer({
-        port,
+      const handle = startCallbackServer({
+        port: 0,
         expectedState,
         timeoutMs: 5_000,
       });
 
       // Give the server time to start
       await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const port = handle.port;
 
       // Simulate the OAuth redirect
       const callbackUrl = `http://localhost:${port}/callback?code=auth-code-xyz&state=${expectedState}`;
@@ -30,7 +31,7 @@ describe("startCallbackServer", () => {
       const html = await response.text();
       expect(html.toLowerCase()).toContain("success");
 
-      const result = await resultPromise;
+      const result = await handle.result;
       expect(result).toEqual({
         code: "auth-code-xyz",
         state: expectedState,
@@ -38,23 +39,24 @@ describe("startCallbackServer", () => {
     });
 
     it("shuts down the server after receiving the callback", async () => {
-      const port = 49152 + Math.floor(Math.random() * 1000);
       const expectedState = "state-456";
 
-      const resultPromise = startCallbackServer({
-        port,
+      const handle = startCallbackServer({
+        port: 0,
         expectedState,
         timeoutMs: 5_000,
       });
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
+      const port = handle.port;
+
       // Hit the callback
       await fetch(
         `http://localhost:${port}/callback?code=code-abc&state=${expectedState}`,
       );
 
-      await resultPromise;
+      await handle.result;
 
       // Server should be closed — a second request should fail
       await expect(
@@ -63,16 +65,17 @@ describe("startCallbackServer", () => {
     });
 
     it("responds with HTML success page containing success message", async () => {
-      const port = 49152 + Math.floor(Math.random() * 1000);
       const expectedState = "state-html";
 
-      const resultPromise = startCallbackServer({
-        port,
+      const handle = startCallbackServer({
+        port: 0,
         expectedState,
         timeoutMs: 5_000,
       });
 
       await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const port = handle.port;
 
       const response = await fetch(
         `http://localhost:${port}/callback?code=code-html&state=${expectedState}`,
@@ -82,24 +85,23 @@ describe("startCallbackServer", () => {
       const html = await response.text();
       expect(html.toLowerCase()).toContain("success");
 
-      await resultPromise;
+      await handle.result;
     });
   });
 
   describe("error cases", () => {
     it("rejects with an error if state does not match expectedState", async () => {
-      const port = 49152 + Math.floor(Math.random() * 1000);
-
-      const resultPromise = startCallbackServer({
-        port,
+      const handle = startCallbackServer({
+        port: 0,
         expectedState: "correct-state",
         timeoutMs: 5_000,
       });
       // Prevent unhandled rejection warning — we'll assert below
-      resultPromise.catch(() => {});
+      handle.result.catch(() => {});
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
+      const port = handle.port;
       const response = await fetch(
         `http://localhost:${port}/callback?code=some-code&state=wrong-state`,
       );
@@ -108,21 +110,20 @@ describe("startCallbackServer", () => {
       const html = await response.text();
       expect(html.toLowerCase()).toContain("error");
 
-      await expect(resultPromise).rejects.toThrow(/state mismatch/i);
+      await expect(handle.result).rejects.toThrow(/state mismatch/i);
     });
 
     it("rejects with an error if code is missing from the callback", async () => {
-      const port = 49152 + Math.floor(Math.random() * 1000);
-
-      const resultPromise = startCallbackServer({
-        port,
+      const handle = startCallbackServer({
+        port: 0,
         expectedState: "some-state",
         timeoutMs: 5_000,
       });
-      resultPromise.catch(() => {});
+      handle.result.catch(() => {});
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
+      const port = handle.port;
       const response = await fetch(
         `http://localhost:${port}/callback?state=some-state`,
       );
@@ -131,42 +132,40 @@ describe("startCallbackServer", () => {
       const html = await response.text();
       expect(html.toLowerCase()).toContain("missing");
 
-      await expect(resultPromise).rejects.toThrow(/missing authorization code/i);
+      await expect(handle.result).rejects.toThrow(/missing authorization code/i);
     });
 
     it("rejects with an error if WHOOP sends an OAuth error response", async () => {
-      const port = 49152 + Math.floor(Math.random() * 1000);
-
-      const resultPromise = startCallbackServer({
-        port,
+      const handle = startCallbackServer({
+        port: 0,
         expectedState: "some-state",
         timeoutMs: 5_000,
       });
-      resultPromise.catch(() => {});
+      handle.result.catch(() => {});
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
+      const port = handle.port;
       const response = await fetch(
         `http://localhost:${port}/callback?error=access_denied&error_description=User+denied+access`,
       );
 
       expect(response.status).toBe(400);
 
-      await expect(resultPromise).rejects.toThrow(/User denied access/);
+      await expect(handle.result).rejects.toThrow(/User denied access/);
     });
 
     it("HTML-escapes error_description to prevent reflected XSS", async () => {
-      const port = 49152 + Math.floor(Math.random() * 1000);
-
-      const resultPromise = startCallbackServer({
-        port,
+      const handle = startCallbackServer({
+        port: 0,
         expectedState: "some-state",
         timeoutMs: 5_000,
       });
-      resultPromise.catch(() => {});
+      handle.result.catch(() => {});
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
+      const port = handle.port;
       const xssPayload = "<script>alert('XSS')</script>";
       const response = await fetch(
         `http://localhost:${port}/callback?error=access_denied&error_description=${encodeURIComponent(xssPayload)}`,
@@ -177,38 +176,35 @@ describe("startCallbackServer", () => {
       expect(html).not.toContain("<script>");
       expect(html).toContain("&lt;script&gt;");
 
-      await expect(resultPromise).rejects.toThrow();
+      await expect(handle.result).rejects.toThrow();
     });
 
     it("rejects with a timeout error if no callback arrives", async () => {
-      const port = 49152 + Math.floor(Math.random() * 1000);
-
-      const resultPromise = startCallbackServer({
-        port,
+      const handle = startCallbackServer({
+        port: 0,
         expectedState: "some-state",
         timeoutMs: 100, // Very short timeout for testing
       });
 
-      await expect(resultPromise).rejects.toThrow(/timed out/i);
+      await expect(handle.result).rejects.toThrow(/timed out/i);
     });
 
     it("shuts down the server after a state mismatch error", async () => {
-      const port = 49152 + Math.floor(Math.random() * 1000);
-
-      const resultPromise = startCallbackServer({
-        port,
+      const handle = startCallbackServer({
+        port: 0,
         expectedState: "correct-state",
         timeoutMs: 5_000,
       });
-      resultPromise.catch(() => {});
+      handle.result.catch(() => {});
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
+      const port = handle.port;
       await fetch(
         `http://localhost:${port}/callback?code=x&state=wrong-state`,
       );
 
-      await expect(resultPromise).rejects.toThrow();
+      await expect(handle.result).rejects.toThrow();
 
       // Server should be closed — another request should fail
       await expect(
@@ -217,17 +213,17 @@ describe("startCallbackServer", () => {
     });
 
     it("returns 404 for non-callback paths", async () => {
-      const port = 49152 + Math.floor(Math.random() * 1000);
       const expectedState = "state-404";
 
-      const resultPromise = startCallbackServer({
-        port,
+      const handle = startCallbackServer({
+        port: 0,
         expectedState,
         timeoutMs: 5_000,
       });
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
+      const port = handle.port;
       const response = await fetch(`http://localhost:${port}/other-path`);
       expect(response.status).toBe(404);
 
@@ -236,36 +232,37 @@ describe("startCallbackServer", () => {
         `http://localhost:${port}/callback?code=cleanup-code&state=${expectedState}`,
       );
 
-      await resultPromise;
+      await handle.result;
     });
 
     it("rejects with EADDRINUSE message when port is already in use", async () => {
-      const port = 49152 + Math.floor(Math.random() * 1000);
       const expectedState = "state-conflict";
 
-      // Start first server to occupy the port
-      const firstPromise = startCallbackServer({
-        port,
+      // Start first server to occupy a specific (non-zero) port
+      const firstHandle = startCallbackServer({
+        port: 0,
         expectedState,
         timeoutMs: 5_000,
       });
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
+      const occupiedPort = firstHandle.port;
+
       // Start second server on the same port — should fail with EADDRINUSE
-      const secondPromise = startCallbackServer({
-        port,
+      const secondHandle = startCallbackServer({
+        port: occupiedPort,
         expectedState: "state-2",
         timeoutMs: 5_000,
       });
 
-      await expect(secondPromise).rejects.toThrow(/already in use/i);
+      await expect(secondHandle.result).rejects.toThrow(/already in use/i);
 
       // Clean up the first server
       await fetch(
-        `http://localhost:${port}/callback?code=cleanup&state=${expectedState}`,
+        `http://localhost:${occupiedPort}/callback?code=cleanup&state=${expectedState}`,
       );
-      await firstPromise;
+      await firstHandle.result;
     });
   });
 });

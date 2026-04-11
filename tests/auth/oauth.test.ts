@@ -584,9 +584,12 @@ describe("authenticate", () => {
     mockSaveTokens.mockResolvedValueOnce(undefined);
 
     // Mock callback server
-    mockStartCallbackServer.mockResolvedValueOnce({
-      code: "new-auth-code",
-      state: "mock-state", // Will be ignored — authenticate generates its own
+    mockStartCallbackServer.mockReturnValueOnce({
+      port: 3000,
+      result: Promise.resolve({
+        code: "new-auth-code",
+        state: "mock-state", // Will be ignored — authenticate generates its own
+      }),
     });
 
     // Mock token exchange fetch
@@ -623,9 +626,12 @@ describe("authenticate", () => {
     });
 
     // Mock callback server for fallback flow
-    mockStartCallbackServer.mockResolvedValueOnce({
-      code: "fallback-auth-code",
-      state: "mock-state",
+    mockStartCallbackServer.mockReturnValueOnce({
+      port: 3000,
+      result: Promise.resolve({
+        code: "fallback-auth-code",
+        state: "mock-state",
+      }),
     });
 
     // Mock token exchange fetch — succeeds

@@ -267,7 +267,7 @@ async function performOAuthFlow(config: OAuthConfig): Promise<string> {
   const port = config.port ?? 3000;
 
   // Start the callback server before opening the browser
-  const callbackPromise = startCallbackServer({
+  const callbackHandle = startCallbackServer({
     port,
     expectedState: state,
   });
@@ -281,7 +281,7 @@ async function performOAuthFlow(config: OAuthConfig): Promise<string> {
   );
 
   // Wait for the callback
-  const { code } = await callbackPromise;
+  const { code } = await callbackHandle.result;
 
   // Exchange the code for tokens
   const tokenResponse = await exchangeCodeForTokens(code, config);

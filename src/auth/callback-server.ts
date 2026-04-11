@@ -19,6 +19,14 @@ export interface CallbackResult {
   state: string;
 }
 
+/** Handle returned immediately when the server starts listening */
+export interface CallbackServerHandle {
+  /** The actual port the server is listening on (useful when port: 0 is passed) */
+  port: number;
+  /** Promise that resolves with the OAuth result or rejects on error/timeout */
+  result: Promise<CallbackResult>;
+}
+
 /** Options for the callback server */
 export interface CallbackServerOptions {
   /** Port to listen on. Default: 3000 */
@@ -69,22 +77,29 @@ function errorHtml(message: string): string {
 /**
  * Start a temporary HTTP server that waits for the OAuth callback.
  *
- * Returns a promise that resolves with the authorization code and state.
- * The server shuts down automatically after receiving the callback or timing out.
+ * Returns a {@link CallbackServerHandle} immediately — `handle.port` reflects
+ * the OS-assigned port when `options.port` is `0`, and `handle.result` is the
+ * promise that resolves with the authorization code and state once the callback
+ * is received. The server shuts down automatically after a callback or timeout.
+ *
+ * Pass `port: 0` (recommended) to let the OS pick a free port and avoid
+ * port-collision errors in environments with parallel processes.
  */
 export function startCallbackServer(
   options: CallbackServerOptions,
-): Promise<CallbackResult> {
-  const port = options.port ?? 3000;
+): CallbackServerHandle {
+  const requestedPort = options.port ?? 3000;
   const timeoutMs = options.timeoutMs ?? 120_000;
 
-  return new Promise<CallbackResult>((resolve, reject) => {
+  let resolvedPort = requestedPort;
+
+  const result = new Promise<CallbackResult>((resolve, reject) => {
     let settled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
     const server: Server = createServer((req, res) => {
       // Only handle GET /callback
-      const url = new URL(req.url ?? "/", `http://localhost:${port}`);
+      const url = new URL(req.url ?? "/", `http://localhost:${resolvedPort}`);
 
       if (url.pathname !== "/callback") {
         res.writeHead(404, { "Content-Type": "text/plain" });
@@ -176,12 +191,26 @@ export function startCallbackServer(
         settled = true;
         const msg =
           err.code === "EADDRINUSE"
-            ? `Port ${port} is already in use. Close the other application and try again.`
+            ? `Port ${requestedPort} is already in use. Close the other application and try again.`
             : `Callback server error: ${err.message}`;
         reject(new Error(msg));
       }
     });
 
-    server.listen(port, "127.0.0.1");
+    server.listen(requestedPort, "127.0.0.1", () => {
+      const addr = server.address();
+      if (addr && typeof addr === "object") {
+        resolvedPort = addr.port;
+      }
+    });
   });
+
+  // Return the handle immediately — callers read `handle.port` after awaiting
+  // a short tick, or pass port: 0 and let `handle.result` drive the flow.
+  return {
+    get port() {
+      return resolvedPort;
+    },
+    result,
+  };
 }
