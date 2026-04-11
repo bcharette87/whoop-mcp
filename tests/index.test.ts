@@ -31,7 +31,6 @@ vi.mock("../src/auth/token-store.js", () => ({
   saveTokens: (...args: unknown[]) => mockSaveTokens(...args),
 }));
 
-const mockGet = vi.fn();
 const mockCreateWhoopClient = vi.fn();
 
 vi.mock("../src/api/client.js", () => ({
@@ -58,9 +57,10 @@ vi.mock("@modelcontextprotocol/sdk/server/stdio.js", () => ({
 // Import the module under test — must be after mocks
 // ---------------------------------------------------------------------------
 
-// We'll dynamically import to control env vars per test
+// We dynamically import so vi.mock() hoists above the import.
+// Note: ESM import() caches — every call returns the same module.
+// This works because main() reads process.env at call time, not import time.
 async function importMain(): Promise<{ main: () => Promise<void> }> {
-  // Clear module cache so env vars are re-read
   const mod = await import("../src/index.js");
   return mod;
 }
@@ -72,7 +72,8 @@ async function importMain(): Promise<{ main: () => Promise<void> }> {
 /** Set up mocks for the happy path */
 function setupHappyPath(): void {
   mockAuthenticate.mockResolvedValue("test-access-token");
-  mockCreateWhoopClient.mockReturnValue({ get: mockGet });
+  const mockClient = { get: vi.fn() };
+  mockCreateWhoopClient.mockReturnValue(mockClient);
   const mockServer = { connect: mockConnect };
   mockCreateWhoopServer.mockReturnValue(mockServer);
   mockConnect.mockResolvedValue(undefined);
@@ -283,7 +284,7 @@ describe("main() entry point", () => {
   describe("MCP server and stdio transport", () => {
     it("creates the MCP server with the WHOOP client", async () => {
       setupHappyPath();
-      const mockClient = { get: mockGet };
+      const mockClient = { get: vi.fn() };
       mockCreateWhoopClient.mockReturnValue(mockClient);
 
       const { main } = await importMain();

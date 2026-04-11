@@ -19,6 +19,7 @@ import { createWhoopServer } from "./server.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
+import { realpathSync } from "node:fs";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -89,11 +90,23 @@ export async function main(): Promise<void> {
 // Auto-execute when run directly (not when imported in tests)
 // ---------------------------------------------------------------------------
 
-const isMainModule =
-  process.argv[1] &&
-  resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+/**
+ * Determine if this file is the Node.js entry point.
+ *
+ * Uses `realpathSync` to resolve symlinks — critical for `npx`, `npm link`,
+ * and Claude Desktop's `{ "command": "npx" }` config, which all invoke the
+ * binary through a symlink.
+ */
+function isMainModule(): boolean {
+  if (!process.argv[1]) return false;
+  try {
+    return realpathSync(resolve(process.argv[1])) === fileURLToPath(import.meta.url);
+  } catch {
+    return false;
+  }
+}
 
-if (isMainModule) {
+if (isMainModule()) {
   main().catch((error: unknown) => {
     console.error("Fatal error:", error);
     process.exit(1);
