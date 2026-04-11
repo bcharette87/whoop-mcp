@@ -1,243 +1,276 @@
 # whoop-mcp
 
-MCP server to connect to WHOOP API.
+[![npm version](https://img.shields.io/npm/v/whoop-mcp.svg)](https://www.npmjs.com/package/whoop-mcp)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js >= 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
 
-## Table of Contents
+An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that connects AI assistants like Claude to your [WHOOP](https://www.whoop.com/) health and fitness data. Ask questions about your recovery, sleep, workouts, and more — all through natural conversation.
 
-- [GitHub Copilot Integration](#github-copilot-integration)
-  - [Custom Agents](#custom-agents)
-  - [Agent Skills](#agent-skills)
-  - [Project Instructions](#project-instructions)
-  - [Reference Checklists](#reference-checklists)
-- [Usage Guide](#usage-guide)
-  - [Invoking Agents](#invoking-agents)
-  - [Using Skills](#using-skills)
-  - [Skill Discovery](#skill-discovery)
+## Features
+
+- 🏋️ **6 health data tools** — recovery, sleep, workouts, cycles, body measurements, and profile
+- 🔐 **Secure OAuth2** — browser-based authentication with automatic token refresh
+- 🔄 **Resilient** — automatic retry on rate limits, token refresh on expiry, clear error messages
+- 💾 **Secure token storage** — tokens stored at `~/.whoop-mcp/tokens.json` with `0600` permissions
+- ⚡ **Zero config** — just add your WHOOP app credentials and go
+- 📦 **Lightweight** — only two runtime dependencies (`@modelcontextprotocol/sdk` + `zod`)
+
+## Prerequisites
+
+1. A [WHOOP](https://www.whoop.com/) account with an active membership
+2. A WHOOP Developer App — create one at [developer.whoop.com](https://developer.whoop.com)
+   - Set the redirect URI to `http://localhost:3000/callback`
+3. [Node.js](https://nodejs.org/) >= 18
+
+## Quickstart (Claude Desktop)
+
+Add this to your Claude Desktop configuration file:
+
+**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+**Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "whoop": {
+      "command": "npx",
+      "args": ["whoop-mcp"],
+      "env": {
+        "WHOOP_CLIENT_ID": "your_client_id",
+        "WHOOP_CLIENT_SECRET": "your_client_secret"
+      }
+    }
+  }
+}
+```
+
+Replace `your_client_id` and `your_client_secret` with the credentials from your [WHOOP Developer App](https://developer.whoop.com).
+
+On first launch, a browser window will open for you to authorize access to your WHOOP data. After authorizing, tokens are cached locally and refresh automatically.
+
+Then ask Claude something like:
+
+> *"How was my recovery this week?"*
+>
+> *"Show me my sleep data from the last 3 days"*
+>
+> *"What workouts did I do this month?"*
+
+## Installation
+
+### Via npx (recommended)
+
+No installation needed — Claude Desktop runs it automatically with the config above.
+
+### Global install
+
+```bash
+npm install -g whoop-mcp
+```
+
+### From source
+
+```bash
+git clone https://github.com/shashankswe2020-ux/whoop-mcp.git
+cd whoop-mcp
+npm install
+npm run build
+```
+
+## Configuration
+
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `WHOOP_CLIENT_ID` | Yes | Your WHOOP Developer App client ID |
+| `WHOOP_CLIENT_SECRET` | Yes | Your WHOOP Developer App client secret |
+
+Set these in your Claude Desktop config (see [Quickstart](#quickstart-claude-desktop)) or as shell environment variables:
+
+```bash
+export WHOOP_CLIENT_ID=your_client_id
+export WHOOP_CLIENT_SECRET=your_client_secret
+```
+
+### Creating a WHOOP Developer App
+
+1. Go to [developer.whoop.com](https://developer.whoop.com)
+2. Create a new application
+3. Set the **Redirect URI** to `http://localhost:3000/callback`
+4. Set the **Privacy Policy URL** (required by WHOOP) — you can use `https://github.com/shashankswe2020-ux/whoop-mcp` or your own URL
+5. Enable the following scopes:
+   - `read:profile`
+   - `read:recovery`
+   - `read:sleep`
+   - `read:workout`
+   - `read:cycles`
+   - `read:body_measurement`
+6. Copy the **Client ID** and **Client Secret**
+
+## Tools
+
+### `get_profile`
+
+Get the authenticated user's basic profile — name and email.
+
+**Parameters:** None
 
 ---
 
-## GitHub Copilot Integration
+### `get_body_measurement`
 
-This repository includes a comprehensive GitHub Copilot configuration with custom agents, skills, and project instructions to enhance AI-assisted development.
+Get the user's body measurements — height, weight, and max heart rate.
 
-### Custom Agents
-
-Located in `.github/agents/`, these are specialized personas that Copilot can adopt for specific tasks:
-
-| Agent | Invocation | Description |
-|-------|------------|-------------|
-| **Build** | `@build` | Implement tasks incrementally — TDD cycle with build, test, verify, commit |
-| **Code Simplify** | `@code-simplify` | Simplify code for clarity and maintainability without changing behavior |
-| **Plan** | `@plan` | Break work into small verifiable tasks with acceptance criteria |
-| **Review** | `@review` | Five-axis code review tailored to the WHOOP MCP project |
-| **Ship** | `@ship` | Pre-launch checklist for npm publish + Claude Desktop integration |
-| **Spec** | `@spec` | Write or update specifications before writing code |
-| **Test** | `@test` | TDD workflow — failing tests first, Prove-It pattern for bugs |
-| **Issue Orchestrator** | `@issue-orchestrator` | Triage open GitHub issues, categorize by type, and dispatch sub-agents to resolve them |
-| **Code Reviewer** | `@code-reviewer` | Five-axis code review covering correctness, readability, architecture, security, and performance |
-| **Security Auditor** | `@security-auditor` | Vulnerability detection, threat modeling, OWASP Top 10 compliance checks |
-| **Test Engineer** | `@test-engineer` | Test strategy design, coverage analysis, and the Prove-It pattern for bugs |
-
-### Agent Skills
-
-Located in `.github/skills/`, these are reusable workflows that Copilot loads on demand. Skills are organized by development phase:
-
-| Phase | Skills |
-|-------|--------|
-| **Define** | `idea-refine`, `spec-driven-development` |
-| **Plan** | `planning-and-task-breakdown` |
-| **Build** | `incremental-implementation`, `source-driven-development`, `context-engineering`, `frontend-ui-engineering`, `api-and-interface-design` |
-| **Verify** | `test-driven-development`, `browser-testing-with-devtools`, `debugging-and-error-recovery` |
-| **Review** | `code-review-and-quality`, `security-and-hardening`, `performance-optimization`, `code-simplification` |
-| **Ship** | `git-workflow-and-versioning`, `ci-cd-and-automation`, `documentation-and-adrs`, `shipping-and-launch`, `deprecation-and-migration` |
-| **Meta** | `using-agent-skills` (discovery and routing) |
-
-### Project Instructions
-
-The `.github/copilot-instructions.md` file provides project-level coding standards that apply to all Copilot interactions:
-
-- **Testing**: TDD, Prove-It pattern, test hierarchy
-- **Code Quality**: Five-axis review, CI gates
-- **Implementation**: Incremental development, verification before commit
-- **Boundaries**: What to always do, ask first, or never do
-
-### Reference Checklists
-
-Located in `references/`, these are quick-reference guides for common concerns:
-
-| Reference | Purpose |
-|-----------|---------|
-| `accessibility-checklist.md` | WCAG 2.1 AA compliance |
-| `performance-checklist.md` | Core Web Vitals targets |
-| `security-checklist.md` | OWASP Top 10 reference |
-| `testing-patterns.md` | AAA pattern, mocking, component/E2E patterns |
+**Parameters:** None
 
 ---
 
-## Usage Guide
+### `get_recovery_collection`
 
-### Invoking Agents
+Get recovery scores for a date range. Returns HRV, resting heart rate, SpO2, and skin temp for each day.
 
-In GitHub Copilot Chat (VS Code, GitHub.com, or CLI), use the `@` symbol followed by the agent name:
+**Parameters:**
 
-```
-@build Implement the next task from the implementation plan
-@code-simplify Simplify the error handling in src/api/client.ts
-@plan Break down Task 9 into sub-tasks
-@review Review recent changes to src/auth/
-@ship Run the full pre-launch checklist
-@spec Write a spec for adding a new workout endpoint
-@test Write tests for the token refresh flow
-@issue-orchestrator triage
-@issue-orchestrator #14
-@code-reviewer Review this PR for security issues
-@security-auditor Audit this authentication flow
-@test-engineer Analyze test coverage for the user module
-```
-
-**What each agent does:**
-
-#### @build
-Implements features using a strict TDD cycle:
-1. Picks the next task from the implementation plan
-2. Writes failing tests (RED), implements code (GREEN), refactors
-3. Runs full verification (test, build, typecheck, lint)
-4. Dispatches sub-agents for review before committing
-
-Skills used: `incremental-implementation`, `test-driven-development`, `debugging-and-error-recovery`
-
-#### @code-simplify
-Reduces code complexity without changing behavior:
-1. Identifies simplification opportunities (nesting, duplication, naming)
-2. Applies each change incrementally with test verification
-3. Dispatches sub-agents to validate the result
-
-Skills used: `code-simplification`, `code-review-and-quality`
-
-#### @plan
-Produces task breakdowns without writing code:
-1. Reads existing specs and implementation status
-2. Decomposes work into ordered, verifiable tasks
-3. Consults sub-agents for architectural and testing input
-
-Skills used: `planning-and-task-breakdown`
-
-#### @review
-Conducts project-specific five-axis code review:
-1. Evaluates correctness, readability, architecture, security, performance
-2. Checks WHOOP-specific concerns (API spec compliance, token handling)
-3. Dispatches specialized sub-agents for deep analysis
-
-Skills used: `code-review-and-quality`, `security-and-hardening`, `performance-optimization`
-
-#### @ship
-Runs the complete pre-launch checklist:
-1. Code quality — tests, build, typecheck, lint, coverage
-2. Security — npm audit, secrets check, token permissions
-3. Packaging — bin field, shebang, tarball contents
-4. Integration — MCP Inspector, Claude Desktop config
-5. Documentation — README, changelog, license
-
-Skills used: `shipping-and-launch`, `ci-cd-and-automation`, `documentation-and-adrs`, `git-workflow-and-versioning`
-
-#### @spec
-Writes specifications before code:
-1. Gathers requirements (objective, tools, auth, constraints)
-2. Produces a structured spec with acceptance criteria
-3. Consults sub-agents before finalizing
-
-Skills used: `spec-driven-development`
-
-#### @test
-Practices strict test-driven development:
-1. Writes failing tests before implementation (RED → GREEN → REFACTOR)
-2. For bugs, uses the Prove-It pattern (reproduce with test first)
-3. Dispatches sub-agents for review and coverage analysis
-
-Skills used: `test-driven-development`, `debugging-and-error-recovery`
-
-#### @issue-orchestrator
-Triages and resolves open GitHub issues by dispatching sub-agents:
-1. Scans open issues (or accepts a specific issue number like `#14`)
-2. Classifies each issue (security, bug, code-quality, testing, dependency)
-3. Prioritizes by severity and dispatches the appropriate sub-agent
-4. Reviews sub-agent output before marking the issue as resolved
-
-Sub-agents dispatched: `code-reviewer`, `security-auditor`, `test-engineer`
-
-#### @code-reviewer
-Evaluates code across five dimensions:
-1. **Correctness** — Does it do what the spec says?
-2. **Readability** — Can others understand it?
-3. **Architecture** — Does it fit the system design?
-4. **Security** — Are there vulnerabilities?
-5. **Performance** — Any bottlenecks?
-
-Findings are categorized as **Critical**, **Important**, or **Suggestion**.
-
-#### @security-auditor
-Performs security-focused review checking:
-- Input validation and injection vectors
-- Authentication/authorization flows
-- Data protection and encryption
-- Security headers and CORS
-- Third-party integration security
-
-Findings are classified by severity: **Critical**, **High**, **Medium**, **Low**, **Info**.
-
-#### @test-engineer
-Helps with test strategy:
-- Analyzes existing coverage
-- Recommends test levels (unit/integration/E2E)
-- Follows the **Prove-It Pattern** for bugs (write failing test first)
-- Ensures tests verify behavior, not implementation
-
-### Using Skills
-
-Skills are automatically loaded by Copilot when relevant to your task. In VS Code, you can use the `/skills` command in chat to view available skills.
-
-Each skill encodes a senior engineer's workflow for a specific task type. For example:
-
-```
-"I need to implement a new API endpoint"
-→ Copilot loads: api-and-interface-design, test-driven-development
-```
-
-### Skill Discovery
-
-The `using-agent-skills` skill provides a decision tree for choosing the right skill:
-
-```
-Task arrives
-    │
-    ├── Vague idea? ──────────────→ idea-refine
-    ├── New feature? ─────────────→ spec-driven-development
-    ├── Have spec, need tasks? ───→ planning-and-task-breakdown
-    ├── Implementing code? ───────→ incremental-implementation
-    ├── Writing tests? ───────────→ test-driven-development
-    ├── Something broke? ─────────→ debugging-and-error-recovery
-    ├── Reviewing code? ──────────→ code-review-and-quality
-    ├── Committing? ──────────────→ git-workflow-and-versioning
-    └── Deploying? ───────────────→ shipping-and-launch
-```
-
-### Typical Feature Workflow
-
-For a complete feature, skills are typically used in this sequence:
-
-1. `idea-refine` — Refine vague ideas
-2. `spec-driven-development` — Define requirements
-3. `planning-and-task-breakdown` — Break into tasks
-4. `context-engineering` — Load right context
-5. `incremental-implementation` — Build slice by slice
-6. `test-driven-development` — Prove each slice works
-7. `code-review-and-quality` — Review before merge
-8. `git-workflow-and-versioning` — Clean commits
-9. `documentation-and-adrs` — Document decisions
-10. `shipping-and-launch` — Deploy safely
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `start` | string | No | Return records after this time (inclusive). ISO 8601 format. |
+| `end` | string | No | Return records before this time (exclusive). Defaults to now. |
+| `limit` | number | No | Max records to return (1–25). Defaults to 10. |
+| `nextToken` | string | No | Pagination token from a previous response. |
 
 ---
+
+### `get_sleep_collection`
+
+Get sleep records for a date range. Returns sleep stages, duration, respiratory rate, and performance scores.
+
+**Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `start` | string | No | Return records after this time (inclusive). ISO 8601 format. |
+| `end` | string | No | Return records before this time (exclusive). Defaults to now. |
+| `limit` | number | No | Max records to return (1–25). Defaults to 10. |
+| `nextToken` | string | No | Pagination token from a previous response. |
+
+---
+
+### `get_workout_collection`
+
+Get workout records for a date range. Returns strain, heart rate zones, calories, and sport type.
+
+**Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `start` | string | No | Return records after this time (inclusive). ISO 8601 format. |
+| `end` | string | No | Return records before this time (exclusive). Defaults to now. |
+| `limit` | number | No | Max records to return (1–25). Defaults to 10. |
+| `nextToken` | string | No | Pagination token from a previous response. |
+
+---
+
+### `get_cycle_collection`
+
+Get physiological cycles for a date range. Returns strain, calories, and heart rate data per cycle.
+
+**Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `start` | string | No | Return records after this time (inclusive). ISO 8601 format. |
+| `end` | string | No | Return records before this time (exclusive). Defaults to now. |
+| `limit` | number | No | Max records to return (1–25). Defaults to 10. |
+| `nextToken` | string | No | Pagination token from a previous response. |
+
+## Authentication
+
+`whoop-mcp` uses OAuth2 Authorization Code flow:
+
+1. **First run:** A browser window opens for you to authorize with WHOOP
+2. **Token caching:** Access and refresh tokens are saved to `~/.whoop-mcp/tokens.json`
+3. **Auto-refresh:** When the access token expires, it's automatically refreshed using the stored refresh token
+4. **Re-authentication:** If the refresh token expires, you'll be prompted to authorize again
+
+Token files are stored with `0600` permissions (user-only read/write).
+
+## Troubleshooting
+
+### "Missing required environment variable: WHOOP_CLIENT_ID"
+
+Your WHOOP credentials aren't set. Add them to your Claude Desktop config or set them as environment variables. See [Configuration](#configuration).
+
+### "Network error: Unable to reach the WHOOP API"
+
+Check your internet connection. The WHOOP API must be reachable at `https://api.prod.whoop.com`.
+
+### "WHOOP API returned 429"
+
+You've hit the rate limit. The server retries automatically with exponential backoff (up to 3 attempts). If this persists, reduce the frequency of your requests.
+
+### "WHOOP API returned 401"
+
+Your access token has expired. The server attempts an automatic refresh. If that fails, delete `~/.whoop-mcp/tokens.json` and restart to re-authenticate:
+
+```bash
+rm ~/.whoop-mcp/tokens.json
+```
+
+### Browser doesn't open during authentication
+
+If the browser doesn't open automatically, check the terminal output for the authorization URL and open it manually.
+
+## Development
+
+### Setup
+
+```bash
+git clone https://github.com/shashankswe2020-ux/whoop-mcp.git
+cd whoop-mcp
+npm install
+```
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `npm run build` | Build TypeScript |
+| `npm test` | Run tests (Vitest) |
+| `npm run typecheck` | Type check (`tsc --noEmit`) |
+| `npm run lint` | Lint (ESLint) |
+| `npm run lint:fix` | Lint + auto-fix |
+| `npm run format` | Format (Prettier) |
+| `npm run dev` | Run in dev mode (tsx) |
+
+### Project Structure
+
+```
+src/
+├── index.ts              # Entry point — auth, client, server, stdio
+├── server.ts             # MCP server + tool registration
+├── auth/
+│   ├── oauth.ts          # OAuth2 Authorization Code flow
+│   ├── token-store.ts    # Secure token persistence
+│   └── callback-server.ts # Local OAuth callback server
+├── api/
+│   ├── client.ts         # HTTP client with retry + refresh
+│   ├── types.ts          # WHOOP API response types
+│   └── endpoints.ts      # API URL constants
+└── tools/
+    ├── get-profile.ts
+    ├── get-recovery.ts
+    ├── get-sleep.ts
+    ├── get-workout.ts
+    ├── get-cycle.ts
+    ├── get-body-measurement.ts
+    └── collection-utils.ts
+```
 
 ## Contributing
 
-When contributing to this repository, Copilot will automatically use the configured agents and skills. Follow the project coding standards in `.github/copilot-instructions.md`.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development workflow, coding conventions, and the project's Copilot agent/skill configuration.
+
+## License
+
+[MIT](LICENSE)

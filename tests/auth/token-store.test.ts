@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { stat, rm, readFile } from "node:fs/promises";
+import { stat, rm, readFile, chmod } from "node:fs/promises";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -325,5 +325,19 @@ describe("deleteTokens", () => {
     await deleteTokens(tempDir);
     const after = await loadTokens(tempDir);
     expect(after).toBeNull();
+  });
+
+  it("rethrows non-ENOENT errors (e.g., permission denied)", async () => {
+    await saveTokens(sampleTokens, tempDir);
+
+    // Make the directory non-writable so unlink fails with EACCES, not ENOENT
+    await chmod(tempDir, 0o444);
+
+    try {
+      await expect(deleteTokens(tempDir)).rejects.toThrow();
+    } finally {
+      // Restore permissions so afterEach cleanup works
+      await chmod(tempDir, 0o755);
+    }
   });
 });

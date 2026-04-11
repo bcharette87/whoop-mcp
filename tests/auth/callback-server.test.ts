@@ -238,5 +238,34 @@ describe("startCallbackServer", () => {
 
       await resultPromise;
     });
+
+    it("rejects with EADDRINUSE message when port is already in use", async () => {
+      const port = 49152 + Math.floor(Math.random() * 1000);
+      const expectedState = "state-conflict";
+
+      // Start first server to occupy the port
+      const firstPromise = startCallbackServer({
+        port,
+        expectedState,
+        timeoutMs: 5_000,
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Start second server on the same port — should fail with EADDRINUSE
+      const secondPromise = startCallbackServer({
+        port,
+        expectedState: "state-2",
+        timeoutMs: 5_000,
+      });
+
+      await expect(secondPromise).rejects.toThrow(/already in use/i);
+
+      // Clean up the first server
+      await fetch(
+        `http://localhost:${port}/callback?code=cleanup&state=${expectedState}`,
+      );
+      await firstPromise;
+    });
   });
 });

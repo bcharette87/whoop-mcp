@@ -158,22 +158,10 @@ export async function getRecoveryCollection(
 
 ## Implementation Status
 
-> **Current phase:** Tasks 1–9 complete — scaffold, API types, token store, API client, OAuth flow, MCP server shell, all 6 tool implementations, error handling, and entry point + CLI. 202 tests passing, typecheck clean, build clean, lint clean.
-> **Next task:** Task 10 — Docs + Publish Prep
-> **Plan:** `docs/specs/implementation-plan.md` → Task 10
+> **Current phase:** All 10 tasks complete — scaffold, API types, token store, API client, OAuth flow, MCP server shell, all 6 tool implementations, error handling, entry point + CLI, and docs + publish prep. 202 tests passing, typecheck clean, build clean, lint clean. Ready for `npm publish`.
+> **Plan:** `docs/specs/implementation-plan.md`
 > **Spec:** `docs/specs/whoop-mcp-server.md`
 > **Code review:** `docs/reviews/code-review-checkpoint-1.md` (Tasks 1–5 approved)
-
-## Active Task Context: Task 10 — Docs + Publish Prep
-
-### What We're Building
-Comprehensive README, finalize .env.example, add LICENSE, prepare for npm publish.
-
-### Dependencies (already complete)
-- All Tasks 1–9 ✅
-
-### After Task 10, Remaining Work
-- None — ship it!
 
 ## Implementation Order
 
@@ -186,7 +174,7 @@ Comprehensive README, finalize .env.example, add LICENSE, prepare for npm publis
 7. ✅ Tool implementations (`src/tools/*.ts`) — 33 tool tests + 16 server integration tests
 8. ✅ Error handling — WhoopNetworkError, 429 retry w/ backoff, 401 token refresh, safeTool wrapper — 17 new tests
 9. ✅ Entry point + CLI (`src/index.ts`) — env var validation, auth wiring, client w/ token refresh, stdio transport — 14 tests
-10. Docs + publish prep ← **NEXT**
+10. ✅ Docs + publish prep — README, LICENSE, CHANGELOG, CONTRIBUTING, package.json metadata
 
 ## Known Issues from Code Review
 - Callback server tests use random port range (flaky in CI) — use port `0` instead

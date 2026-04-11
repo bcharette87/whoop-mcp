@@ -514,4 +514,49 @@ describe("createWhoopServer (error handling)", () => {
       await cleanup();
     }
   });
+
+  it("returns isError for WhoopApiError with string body", async () => {
+    const apiError = new WhoopApiError(503, "Service Unavailable", "plain text error body");
+    const { client: errClient, cleanup } = await createErrorServer(apiError);
+
+    try {
+      const result = await errClient.callTool({ name: "get_profile", arguments: {} });
+
+      expect(result.isError).toBe(true);
+      const content = result.content as Array<{ type: string; text: string }>;
+      expect(content[0].text).toContain("503");
+      expect(content[0].text).toContain("Service Unavailable");
+      expect(content[0].text).toContain("plain text error body");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("returns isError with generic message for non-Error thrown values", async () => {
+    // Simulate a tool handler that throws a non-Error value (e.g., a string)
+    const nonErrorClient: WhoopClient = {
+      get: async <T>(): Promise<T> => {
+        throw "a string, not an Error";
+      },
+    };
+    const server = createWhoopServer(nonErrorClient);
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
+    const mcpClient = new Client({ name: "non-error-test", version: "1.0.0" });
+    await Promise.all([
+      mcpClient.connect(clientTransport),
+      server.connect(serverTransport),
+    ]);
+
+    try {
+      const result = await mcpClient.callTool({ name: "get_profile", arguments: {} });
+
+      expect(result.isError).toBe(true);
+      const content = result.content as Array<{ type: string; text: string }>;
+      expect(content[0].text).toBe("An unexpected error occurred");
+    } finally {
+      await mcpClient.close();
+      await server.close();
+    }
+  });
 });

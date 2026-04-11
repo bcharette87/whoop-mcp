@@ -53,24 +53,9 @@ npm run dev         # Dev mode (tsx)
 - **OAuth:** Authorization Code flow, tokens at `~/.whoop-mcp/tokens.json` (0600 perms)
 
 ## Implementation Status
-- Tasks 1–9 complete (scaffold, types, token store, API client, OAuth, MCP server shell, tool implementations, error handling, entry point + CLI)
+- All 10 tasks complete (scaffold, types, token store, API client, OAuth, MCP server shell, tool implementations, error handling, entry point + CLI, docs + publish prep)
 - 202 tests passing, typecheck clean, build clean, lint clean
-- **Next:** Task 10 — Docs + publish prep
-
-## Task 10 Context — Docs + Publish Prep
-
-### Goal
-Write comprehensive README, finalize .env.example, add LICENSE, prepare for `npm publish`.
-
-### Acceptance Criteria
-- README includes: description, features, quickstart (Claude Desktop config), all 6 tools, environment setup, contributing guide
-- `npm pack` produces a clean tarball
-- `npx whoop-mcp` works after npm publish (bin field already configured)
-
-### Package.json bin field (already configured)
-```json
-"bin": { "whoop-mcp": "dist/index.js" }
-```
+- Ready for `npm publish`
 
 ## Boundaries
 - **Always:** Run tests before commits, validate input with Zod, store tokens securely (0600)

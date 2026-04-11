@@ -677,5 +677,62 @@ describe("createWhoopClient", () => {
       expect(client).toBeDefined();
       expect(typeof client.get).toBe("function");
     });
+
+    it("falls back to exponential backoff when Retry-After header is non-numeric", async () => {
+      // 429 with a non-numeric Retry-After header → parseRetryAfter returns null → exponential backoff
+      const headers429 = new Headers();
+      headers429.set("retry-after", "not-a-number");
+
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 429,
+          statusText: "Too Many Requests",
+          headers: headers429,
+          json: () => Promise.resolve({ message: "rate limited" }),
+        } as unknown as Response)
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ data: "ok" }),
+        } as Response);
+
+      const client = createWhoopClient({
+        accessToken: TEST_TOKEN,
+        baseUrl: TEST_BASE_URL,
+      });
+
+      const result = await client.get<{ data: string }>("/v2/recovery");
+      expect(result).toEqual({ data: "ok" });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("falls back to exponential backoff when Retry-After header is negative", async () => {
+      const headers429 = new Headers();
+      headers429.set("retry-after", "-5");
+
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 429,
+          statusText: "Too Many Requests",
+          headers: headers429,
+          json: () => Promise.resolve({ message: "rate limited" }),
+        } as unknown as Response)
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ data: "ok" }),
+        } as Response);
+
+      const client = createWhoopClient({
+        accessToken: TEST_TOKEN,
+        baseUrl: TEST_BASE_URL,
+      });
+
+      const result = await client.get<{ data: string }>("/v2/recovery");
+      expect(result).toEqual({ data: "ok" });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
   });
 });

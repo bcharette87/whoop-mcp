@@ -204,6 +204,34 @@ describe("exchangeCodeForTokens", () => {
       exchangeCodeForTokens("used-code", TEST_CONFIG),
     ).rejects.toThrow(/Code has been used already/);
   });
+
+  it("falls back to 'unknown error' when error_description is not a string", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: () =>
+        Promise.resolve({
+          error: "invalid_grant",
+          // error_description is missing entirely
+        }),
+    });
+
+    await expect(
+      exchangeCodeForTokens("bad-code", TEST_CONFIG),
+    ).rejects.toThrow(/unknown error/);
+  });
+
+  it("falls back to 'unknown error' when error body JSON parse fails", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: () => Promise.reject(new Error("not JSON")),
+    });
+
+    await expect(
+      exchangeCodeForTokens("server-error-code", TEST_CONFIG),
+    ).rejects.toThrow(/unknown error/);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -298,6 +326,34 @@ describe("refreshAccessToken", () => {
     await expect(
       refreshAccessToken("revoked-token", TEST_CONFIG),
     ).rejects.toThrow(/Refresh token revoked/);
+  });
+
+  it("falls back to 'unknown error' when error_description is not a string", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      json: () =>
+        Promise.resolve({
+          error: "server_error",
+          // error_description is not present
+        }),
+    });
+
+    await expect(
+      refreshAccessToken("bad-refresh", TEST_CONFIG),
+    ).rejects.toThrow(/unknown error/);
+  });
+
+  it("falls back to 'unknown error' when error body JSON parse fails", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: () => Promise.reject(new Error("not JSON")),
+    });
+
+    await expect(
+      refreshAccessToken("error-refresh", TEST_CONFIG),
+    ).rejects.toThrow(/unknown error/);
   });
 });
 
