@@ -54,10 +54,10 @@ npm run dev         # Dev mode (tsx)
 
 ## Implementation Status
 - All 10 tasks complete (scaffold, types, token store, API client, OAuth, MCP server shell, tool implementations, error handling, entry point + CLI, docs + publish prep)
-- 202 tests passing, typecheck clean, build clean, lint clean
+- 212 tests passing, typecheck clean, build clean, lint clean
 - ✅ MCP Inspector integration tested 2026-04-12 — OAuth flow, `get_profile` tool returning real data
 - ✅ Claude Desktop integration tested 2026-04-12 — server connected, OAuth completed, tools accessible
-- Ready for `npm publish`
+- ✅ Published to npm 2026-04-12 — `whoop-ai-mcp@0.1.0` at https://www.npmjs.com/package/whoop-ai-mcp
 
 ## Boundaries
 - **Always:** Run tests before commits, validate input with Zod, store tokens securely (0600)
