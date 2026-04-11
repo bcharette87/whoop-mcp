@@ -1,7 +1,7 @@
 ---
 name: "review"
 description: >
-  Conduct a five-axis code review — correctness, readability, architecture,
+  👁️ Conduct a five-axis code review — correctness, readability, architecture,
   security, and performance. Tailored to the WHOOP MCP project with
   project-specific checks.
 user-invocable: true

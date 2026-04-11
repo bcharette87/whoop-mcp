@@ -1,7 +1,7 @@
 ---
 name: "plan"
 description: >
-  Break work into small verifiable tasks with acceptance criteria and dependency
+  📋 Break work into small verifiable tasks with acceptance criteria and dependency
   ordering. Read-only planning — no code changes.
 user-invocable: true
 argument-hint: >

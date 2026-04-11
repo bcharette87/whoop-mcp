@@ -1,7 +1,7 @@
 ---
 name: "spec"
 description: >
-  Start spec-driven development — write or update the WHOOP MCP server
+  📐 Start spec-driven development — write or update the WHOOP MCP server
   specification before writing code. Defines what to build, why, and how
   to verify it's done.
 user-invocable: true
