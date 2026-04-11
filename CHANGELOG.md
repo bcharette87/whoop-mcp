@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-04-12
+
+### Added
+- `SECURITY.md` — vulnerability reporting process, OAuth/token/API security design, known limitations
+- `CODE_OF_CONDUCT.md` — Contributor Covenant v2.1
+- `.github/workflows/ci.yml` — GitHub Actions CI pipeline (typecheck, lint, test, coverage, build) on Node 18/20/22
+
 ## [0.1.1] - 2026-04-12
 
 ### Changed
