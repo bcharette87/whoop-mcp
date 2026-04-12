@@ -18,7 +18,7 @@ export const WHOOP_TOKEN_URL =
 
 /** All OAuth scopes required by the 6 MCP tools */
 export const WHOOP_REQUIRED_SCOPES =
-  "read:recovery read:cycles read:workout read:sleep read:profile read:body_measurement";
+  "offline read:recovery read:cycles read:workout read:sleep read:profile read:body_measurement";
 
 /** Default OAuth redirect URI for the local callback server */
 export const WHOOP_REDIRECT_URI = "http://localhost:3000/callback";
