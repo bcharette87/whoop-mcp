@@ -128,6 +128,39 @@ app.all("/mcp", async (req: Request, res: Response): Promise<void> => {
   await transport.handleRequest(req, res, req.body);
 });
 
+// Route racine pour MCP
+app.post("/", async (req: Request, res: Response): Promise<void> => {
+  const authHeader = req.headers.authorization ?? "";
+  const sessionToken = authHeader.replace("Bearer ", "");
+  const accessToken = tokenStore.get(sessionToken);
+  if (!accessToken) {
+    res.setHeader("WWW-Authenticate", `Bearer realm="${BASE_URL}"`);
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const client = createWhoopClient({ accessToken, onTokenRefresh: async () => accessToken });
+  const server = createWhoopServer(client);
+  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: () => crypto.randomUUID() });
+  await server.connect(transport);
+  await transport.handleRequest(req, res, req.body);
+});
+
+app.get("/", async (req: Request, res: Response): Promise<void> => {
+  const authHeader = req.headers.authorization ?? "";
+  const sessionToken = authHeader.replace("Bearer ", "");
+  const accessToken = tokenStore.get(sessionToken);
+  if (!accessToken) {
+    res.setHeader("WWW-Authenticate", `Bearer realm="${BASE_URL}"`);
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const client = createWhoopClient({ accessToken, onTokenRefresh: async () => accessToken });
+  const server = createWhoopServer(client);
+  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: () => crypto.randomUUID() });
+  await server.connect(transport);
+  await transport.handleRequest(req, res, req.body);
+});
+
 app.listen(PORT, () => {
   console.log(`Whoop MCP server running on http://0.0.0.0:${PORT}`);
 });
