@@ -1,4 +1,4 @@
-import express, { Request, Response } from "express";
+import express, { Request, Response, NextFunction } from "express";
 import crypto from "node:crypto";
 import { createWhoopClient } from "./api/client.js";
 import { createWhoopServer } from "./server.js";
@@ -7,13 +7,19 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 const app = express();
 app.use(express.json());
-app.use((_req: Request, res: Response, next) => {
+app.use(express.urlencoded({ extended: false }));
+
+app.use((_req: Request, res: Response, next: NextFunction): void => {
   res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, mcp-session-id");
   res.setHeader("Access-Control-Expose-Headers", "mcp-session-id");
   next();
 });
-app.use(express.urlencoded({ extended: false }));
+
+app.options("*", (_req: Request, res: Response): void => {
+  res.status(204).send();
+});
 
 const PORT = process.env.PORT || 8080;
 const BASE_URL = process.env.WHOOP_REDIRECT_URI?.replace("/callback", "") || `http://localhost:${PORT}`;
@@ -126,9 +132,6 @@ async function handleMcpRequest(req: Request, res: Response): Promise<void> {
   const bearerToken = authHeader.replace("Bearer ", "").trim();
   const whoopToken = tokenStore.get(bearerToken);
 
-  console.log("MCP:", req.method, "| auth:", !!whoopToken, "| session-id:", req.headers["mcp-session-id"]);
-  console.log("MCP body:", JSON.stringify(req.body)?.substring(0, 150));
-
   if (!whoopToken) {
     res.setHeader("WWW-Authenticate", `Bearer realm="${BASE_URL}"`);
     res.status(401).json({ error: "unauthorized" });
@@ -136,33 +139,49 @@ async function handleMcpRequest(req: Request, res: Response): Promise<void> {
   }
 
   const incomingSessionId = req.headers["mcp-session-id"] as string | undefined;
-  let session = incomingSessionId ? mcpSessions.get(incomingSessionId) : mcpSessions.get(bearerToken);
-
-  if (!session) {
-    console.log("MCP - creating new session for token");
-    const client = createWhoopClient({
-      accessToken: whoopToken,
-      onTokenRefresh: async () => whoopToken,
-    });
-    const server = createWhoopServer(client);
-    const newSessionId = crypto.randomUUID();
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => newSessionId,
-    });
-    await server.connect(transport);
-    session = { transport, server };
-    mcpSessions.set(newSessionId, session);
-    mcpSessions.set(bearerToken, session);
-    console.log("MCP - new session created:", newSessionId);
-    res.setHeader("mcp-session-id", newSessionId);
+  
+  // Si session existante, l'utiliser
+  if (incomingSessionId) {
+    const existingSession = mcpSessions.get(incomingSessionId);
+    if (existingSession) {
+      await existingSession.transport.handleRequest(req, res, req.body);
+      return;
+    }
   }
 
-const originalWrite = res.write.bind(res);
-  res.write = (chunk: unknown) => {
-    console.log("MCP RESPONSE:", chunk?.toString()?.substring(0, 300));
-    return originalWrite(chunk);
-  };
-  await session.transport.handleRequest(req, res, req.body);}
+  // Nouvelle session seulement pour initialize
+  const body = req.body as Record<string, unknown>;
+  const isInitialize = body?.method === "initialize";
+  
+  if (!isInitialize) {
+    res.status(400).json({ 
+      jsonrpc: "2.0", 
+      error: { code: -32000, message: "Session not found" },
+      id: null 
+    });
+    return;
+  }
+
+  // Créer nouvelle session
+  const newSessionId = crypto.randomUUID();
+  const client = createWhoopClient({
+    accessToken: whoopToken,
+    onTokenRefresh: async () => whoopToken,
+  });
+  const server = createWhoopServer(client);
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: () => newSessionId,
+    enableJsonResponse: true,
+  });
+  
+  const session: McpSession = { transport, server };
+  await server.connect(transport);
+  mcpSessions.set(newSessionId, session);
+  
+  console.log("New MCP session:", newSessionId);
+  
+  await transport.handleRequest(req, res, req.body);
+}
 
 app.post("/mcp", handleMcpRequest);
 app.get("/mcp", handleMcpRequest);
