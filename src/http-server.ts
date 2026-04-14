@@ -7,6 +7,12 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 const app = express();
 app.use(express.json());
+app.use((_req: Request, res: Response, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, mcp-session-id");
+  res.setHeader("Access-Control-Expose-Headers", "mcp-session-id");
+  next();
+});
 app.use(express.urlencoded({ extended: false }));
 
 const PORT = process.env.PORT || 8080;
@@ -148,6 +154,7 @@ async function handleMcpRequest(req: Request, res: Response): Promise<void> {
     mcpSessions.set(newSessionId, session);
     mcpSessions.set(bearerToken, session);
     console.log("MCP - new session created:", newSessionId);
+    res.setHeader("mcp-session-id", newSessionId);
   }
 
   await session.transport.handleRequest(req, res, req.body);
