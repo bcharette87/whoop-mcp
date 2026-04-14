@@ -120,8 +120,8 @@ async function handleMcpRequest(req: Request, res: Response): Promise<void> {
   const bearerToken = authHeader.replace("Bearer ", "").trim();
   const whoopToken = tokenStore.get(bearerToken);
 
-  console.log("MCP - bearer:", bearerToken?.substring(0, 20));
-  console.log("MCP - whoopToken found:", !!whoopToken);
+console.log("MCP - method:", req.method, "whoopToken found:", !!whoopToken);
+  console.log("MCP - body:", JSON.stringify(req.body)?.substring(0, 200));
 
   if (!whoopToken) {
     res.setHeader("WWW-Authenticate", `Bearer realm="${BASE_URL}"`);
