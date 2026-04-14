@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request, Response } from "express";
 import crypto from "node:crypto";
 import { createWhoopClient } from "./api/client.js";
 import { createWhoopServer } from "./server.js";
@@ -16,7 +16,7 @@ const REDIRECT_URI = process.env.WHOOP_REDIRECT_URI!;
 const tokenStore = new Map<string, string>();
 const pendingStates = new Map<string, string>();
 
-app.get("/.well-known/oauth-authorization-server", (_req, res) => {
+app.get("/.well-known/oauth-authorization-server", (_req: Request, res: Response): void => {
   res.json({
     issuer: BASE_URL,
     authorization_endpoint: `${BASE_URL}/authorize`,
@@ -28,14 +28,14 @@ app.get("/.well-known/oauth-authorization-server", (_req, res) => {
   });
 });
 
-app.get("/.well-known/oauth-protected-resource", (_req, res) => {
+app.get("/.well-known/oauth-protected-resource", (_req: Request, res: Response): void => {
   res.json({
     resource: BASE_URL,
     authorization_servers: [BASE_URL],
   });
 });
 
-app.post("/register", (req, res) => {
+app.post("/register", (req: Request, res: Response): void => {
   const clientId = `claude-${crypto.randomUUID()}`;
   res.status(201).json({
     client_id: clientId,
@@ -44,7 +44,7 @@ app.post("/register", (req, res) => {
   });
 });
 
-app.get("/authorize", (req, res) => {
+app.get("/authorize", (req: Request, res: Response): void => {
   const { state, redirect_uri } = req.query as Record<string, string>;
   const whoopAuthUrl =
     `https://api.prod.whoop.com/oauth/oauth2/auth` +
@@ -59,7 +59,7 @@ app.get("/authorize", (req, res) => {
   res.redirect(whoopAuthUrl);
 });
 
-app.get("/callback", async (req, res) => {
+app.get("/callback", async (req: Request, res: Response): Promise<void> => {
   const { code, state } = req.query as Record<string, string | undefined>;
   try {
     const tokenRes = await fetch("https://api.prod.whoop.com/oauth/oauth2/token", {
@@ -79,7 +79,8 @@ app.get("/callback", async (req, res) => {
     const redirectUri = state ? pendingStates.get(state) : undefined;
     if (redirectUri && state) {
       pendingStates.delete(state);
-      return res.redirect(`${redirectUri}?code=${sessionToken}&state=${state}`);
+      res.redirect(`${redirectUri}?code=${sessionToken}&state=${state}`);
+      return;
     }
     res.send("✅ Connexion WHOOP réussie! Retourne dans Claude et réessaie.");
   } catch (_err) {
@@ -87,11 +88,12 @@ app.get("/callback", async (req, res) => {
   }
 });
 
-app.post("/token", (req, res) => {
+app.post("/token", (req: Request, res: Response): void => {
   const { code } = req.body as { code: string };
   const accessToken = tokenStore.get(code);
   if (!accessToken) {
-    return res.status(400).json({ error: "invalid_grant" });
+    res.status(400).json({ error: "invalid_grant" });
+    return;
   }
   res.json({
     access_token: code,
@@ -100,13 +102,14 @@ app.post("/token", (req, res) => {
   });
 });
 
-app.all("/mcp", async (req, res) => {
+app.all("/mcp", async (req: Request, res: Response): Promise<void> => {
   const authHeader = req.headers.authorization ?? "";
   const sessionToken = authHeader.replace("Bearer ", "");
   const accessToken = tokenStore.get(sessionToken);
   if (!accessToken) {
     res.setHeader("WWW-Authenticate", `Bearer realm="${BASE_URL}"`);
-    return res.status(401).json({ error: "unauthorized" });
+    res.status(401).json({ error: "unauthorized" });
+    return;
   }
   const client = createWhoopClient({ accessToken, onTokenRefresh: async () => accessToken });
   const server = createWhoopServer(client);
