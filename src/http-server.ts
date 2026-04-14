@@ -6,6 +6,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 
 const PORT = process.env.PORT || 8080;
 const BASE_URL = process.env.WHOOP_REDIRECT_URI?.replace("/callback", "") || `http://localhost:${PORT}`;
@@ -15,7 +16,13 @@ const REDIRECT_URI = process.env.WHOOP_REDIRECT_URI!;
 
 const tokenStore = new Map<string, string>();
 const pendingStates = new Map<string, string>();
-const mcpTransports = new Map<string, StreamableHTTPServerTransport>();
+
+// Session MCP persistante par token
+interface McpSession {
+  transport: StreamableHTTPServerTransport;
+  server: ReturnType<typeof createWhoopServer>;
+}
+const mcpSessions = new Map<string, McpSession>();
 
 app.get("/.well-known/oauth-authorization-server", (_req: Request, res: Response): void => {
   res.json({
@@ -41,7 +48,7 @@ app.post("/register", (req: Request, res: Response): void => {
   res.status(201).json({
     client_id: clientId,
     client_secret: "not-used",
-    redirect_uris: req.body?.redirect_uris || [],
+    redirect_uris: (req.body as Record<string, string[]>)?.redirect_uris || [],
   });
 });
 
@@ -90,14 +97,15 @@ app.get("/callback", async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-app.post("/token", express.urlencoded({ extended: false }), (req: Request, res: Response): void => {
+app.post("/token", (req: Request, res: Response): void => {
   const body = req.body as Record<string, string>;
-  const code = body?.code ?? (req.query as Record<string, string>)?.code;
+  const code = body?.code;
   const whoopAccessToken = code ? tokenStore.get(code) : undefined;
   if (!whoopAccessToken || !code) {
     res.status(400).json({ error: "invalid_grant" });
     return;
   }
+  // Indexer par le whoopAccessToken pour les requêtes MCP
   tokenStore.set(whoopAccessToken, whoopAccessToken);
   res.json({
     access_token: whoopAccessToken,
@@ -109,10 +117,11 @@ app.post("/token", express.urlencoded({ extended: false }), (req: Request, res: 
 
 async function handleMcpRequest(req: Request, res: Response): Promise<void> {
   const authHeader = req.headers.authorization ?? "";
-  const accessToken = authHeader.replace("Bearer ", "");
-  const whoopToken = tokenStore.get(accessToken);
+  const bearerToken = authHeader.replace("Bearer ", "").trim();
+  const whoopToken = tokenStore.get(bearerToken);
 
-  console.log("MCP request - whoopToken found:", !!whoopToken);
+  console.log("MCP - bearer:", bearerToken?.substring(0, 20));
+  console.log("MCP - whoopToken found:", !!whoopToken);
 
   if (!whoopToken) {
     res.setHeader("WWW-Authenticate", `Bearer realm="${BASE_URL}"`);
@@ -120,20 +129,29 @@ async function handleMcpRequest(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  let transport = mcpTransports.get(accessToken);
-  if (!transport) {
-    const client = createWhoopClient({ accessToken: whoopToken, onTokenRefresh: async () => whoopToken });
+  // Créer ou réutiliser la session MCP
+  let session = mcpSessions.get(bearerToken);
+  if (!session) {
+    console.log("MCP - creating new session");
+    const client = createWhoopClient({
+      accessToken: whoopToken,
+      onTokenRefresh: async () => whoopToken,
+    });
     const server = createWhoopServer(client);
-    transport = new StreamableHTTPServerTransport({ sessionIdGenerator: () => crypto.randomUUID() });
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => crypto.randomUUID(),
+    });
     await server.connect(transport);
-    mcpTransports.set(accessToken, transport);
+    session = { transport, server };
+    mcpSessions.set(bearerToken, session);
   }
 
-  await transport.handleRequest(req, res, req.body);
+  await session.transport.handleRequest(req, res, req.body);
 }
 
 app.post("/mcp", handleMcpRequest);
 app.get("/mcp", handleMcpRequest);
+app.delete("/mcp", handleMcpRequest);
 app.post("/", handleMcpRequest);
 app.get("/", handleMcpRequest);
 
