@@ -90,10 +90,16 @@ if (redirectUri && state) {
 });
 
 app.post("/token", (req: Request, res: Response): void => {
-  const { code } = req.body as { code: string };
-  const accessToken = tokenStore.get(code);
+  const code = (req.body as Record<string, string>)?.code 
+    ?? (req.query as Record<string, string>)?.code;
+  
+  console.log("Token request - code:", code);
+  console.log("Token store size:", tokenStore.size);
+  console.log("Token store keys:", Array.from(tokenStore.keys()));
+  
+  const accessToken = code ? tokenStore.get(code) : undefined;
   if (!accessToken) {
-    res.status(400).json({ error: "invalid_grant" });
+    res.status(400).json({ error: "invalid_grant", debug: `code=${code}, store_size=${tokenStore.size}` });
     return;
   }
   res.json({
