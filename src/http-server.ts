@@ -130,14 +130,41 @@ async function handleMcpRequest(req: Request, res: Response): Promise<void> {
   const bearerToken = authHeader.replace("Bearer ", "").trim();
   const whoopToken = tokenStore.get(bearerToken);
 
-console.log("MCP - method:", req.method, "whoopToken found:", !!whoopToken);
+  console.log("MCP - method:", req.method, "whoopToken found:", !!whoopToken);
   console.log("MCP - body:", JSON.stringify(req.body)?.substring(0, 200));
+  console.log("MCP - mcp-session-id header:", req.headers["mcp-session-id"]);
 
   if (!whoopToken) {
     res.setHeader("WWW-Authenticate", `Bearer realm="${BASE_URL}"`);
     res.status(401).json({ error: "unauthorized" });
     return;
   }
+
+  const sessionId = req.headers["mcp-session-id"] as string | undefined;
+
+  let session = sessionId ? mcpSessions.get(sessionId) : undefined;
+  
+  if (!session) {
+    console.log("MCP - creating new session");
+    const client = createWhoopClient({
+      accessToken: whoopToken,
+      onTokenRefresh: async () => whoopToken,
+    });
+    const server = createWhoopServer(client);
+    const newSessionId = crypto.randomUUID();
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => newSessionId,
+    });
+    await server.connect(transport);
+    session = { transport, server };
+    mcpSessions.set(newSessionId, session);
+    // Aussi indexer par bearerToken pour retrouver la session
+    mcpSessions.set(bearerToken, session);
+    res.setHeader("mcp-session-id", newSessionId);
+  }
+
+  await session.transport.handleRequest(req, res, req.body);
+}
 
   // Créer ou réutiliser la session MCP
   let session = mcpSessions.get(bearerToken);
