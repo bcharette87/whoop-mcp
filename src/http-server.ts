@@ -93,19 +93,22 @@ app.post("/token", express.urlencoded({ extended: false }), (req: Request, res: 
   const body = req.body as Record<string, string>;
   const code = body?.code ?? (req.query as Record<string, string>)?.code;
   
-  console.log("Token request body:", JSON.stringify(req.body));
   console.log("Token request - code:", code);
-  console.log("Token store keys:", Array.from(tokenStore.keys()));
+  console.log("Token store has code:", code ? tokenStore.has(code) : false);
   
   const accessToken = code ? tokenStore.get(code) : undefined;
+  
+  console.log("Access token found:", !!accessToken);
+  
   if (!accessToken) {
     res.status(400).json({ error: "invalid_grant" });
     return;
   }
   res.json({
-    access_token: code,
+    access_token: accessToken,
     token_type: "bearer",
     expires_in: 3600,
+    scope: "read:recovery read:cycles read:sleep read:workout read:profile read:body_measurement offline",
   });
 });
 
