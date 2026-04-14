@@ -77,9 +77,10 @@ app.get("/callback", async (req: Request, res: Response): Promise<void> => {
     const sessionToken = crypto.randomUUID();
     tokenStore.set(sessionToken, tokens.access_token);
     const redirectUri = state ? pendingStates.get(state) : undefined;
-    if (redirectUri && state) {
+if (redirectUri && state) {
       pendingStates.delete(state);
-      res.redirect(`${redirectUri}?code=${sessionToken}&state=${state}`);
+      const separator = redirectUri.includes("?") ? "&" : "?";
+      res.redirect(`${redirectUri}${separator}code=${sessionToken}&state=${state}`);
       return;
     }
     res.send("✅ Connexion WHOOP réussie! Retourne dans Claude et réessaie.");
