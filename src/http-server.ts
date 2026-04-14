@@ -93,19 +93,18 @@ app.post("/token", express.urlencoded({ extended: false }), (req: Request, res: 
   const body = req.body as Record<string, string>;
   const code = body?.code ?? (req.query as Record<string, string>)?.code;
   
-  console.log("Token request - code:", code);
-  console.log("Token store has code:", code ? tokenStore.has(code) : false);
+  const whoopAccessToken = code ? tokenStore.get(code) : undefined;
   
-  const accessToken = code ? tokenStore.get(code) : undefined;
-  
-  console.log("Access token found:", !!accessToken);
-  
-  if (!accessToken) {
+  if (!whoopAccessToken || !code) {
     res.status(400).json({ error: "invalid_grant" });
     return;
   }
+
+  // Stocker aussi avec le whoopAccessToken comme clé pour que /mcp puisse le retrouver
+  tokenStore.set(whoopAccessToken, whoopAccessToken);
+
   res.json({
-    access_token: accessToken,
+    access_token: whoopAccessToken,
     token_type: "bearer",
     expires_in: 3600,
     scope: "read:recovery read:cycles read:sleep read:workout read:profile read:body_measurement offline",
