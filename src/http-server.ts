@@ -101,14 +101,24 @@ app.post("/token", (req: Request, res: Response): void => {
   const body = req.body as Record<string, string>;
   const code = body?.code;
   const whoopAccessToken = code ? tokenStore.get(code) : undefined;
+  
+  console.log("Token exchange - code:", code?.substring(0, 20));
+  console.log("Token exchange - whoopToken found:", !!whoopAccessToken);
+  console.log("Token exchange - whoopToken preview:", whoopAccessToken?.substring(0, 30));
+  
   if (!whoopAccessToken || !code) {
     res.status(400).json({ error: "invalid_grant" });
     return;
   }
-  // Indexer par le whoopAccessToken pour les requêtes MCP
-  tokenStore.set(whoopAccessToken, whoopAccessToken);
+
+  // Créer un nouveau token de session et l'associer au vrai token WHOOP
+  const newSessionToken = crypto.randomUUID();
+  tokenStore.set(newSessionToken, whoopAccessToken);
+  
+  console.log("Token exchange - new session token:", newSessionToken.substring(0, 20));
+  
   res.json({
-    access_token: whoopAccessToken,
+    access_token: newSessionToken,
     token_type: "bearer",
     expires_in: 3600,
     scope: "read:recovery read:cycles read:sleep read:workout read:profile read:body_measurement offline",
