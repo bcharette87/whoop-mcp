@@ -157,8 +157,12 @@ async function handleMcpRequest(req: Request, res: Response): Promise<void> {
     res.setHeader("mcp-session-id", newSessionId);
   }
 
-  await session.transport.handleRequest(req, res, req.body);
-}
+const originalWrite = res.write.bind(res);
+  res.write = (chunk: unknown) => {
+    console.log("MCP RESPONSE:", chunk?.toString()?.substring(0, 300));
+    return originalWrite(chunk);
+  };
+  await session.transport.handleRequest(req, res, req.body);}
 
 app.post("/mcp", handleMcpRequest);
 app.get("/mcp", handleMcpRequest);
